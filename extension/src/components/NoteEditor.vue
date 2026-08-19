@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
-  ArrowLeft,
   Bold,
   Code,
   Eye,
-  EyeOff,
+  FileCode2,
   Heading2,
   Italic,
   Link2,
   List,
   ListOrdered,
+  Minimize2,
   Paperclip,
   Redo2,
   Smile,
@@ -19,14 +19,14 @@ import {
   Table,
   TextQuote,
   Trash2,
+  Type,
   Undo2,
 } from 'lucide-vue-next'
 import type { Note } from '../stores/notes'
-import { state } from '../stores/notes'
+import { state, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
 
 const emit = defineEmits<{
-  back: []
   deleted: [id: number]
 }>()
 
@@ -283,10 +283,6 @@ async function changeCategory(cat: string) {
   }
 }
 
-function togglePreview() {
-  state.displayMode = isPreview.value ? 'rich' : 'preview'
-}
-
 function closeEmoji() {
   showEmoji.value = false
 }
@@ -309,9 +305,6 @@ function renderPreview(md: string): string {
 <template>
   <div class="note-editor">
     <header class="editor-header">
-      <button class="icon-btn" :aria-label="$gettext('Back')" @click="emit('back')">
-        <ArrowLeft :size="18" />
-      </button>
       <select
         class="category-select"
         :value="props.note.category?.split('/')[0] || ''"
@@ -331,14 +324,39 @@ function renderPreview(md: string): string {
         <Star :size="18" />
       </button>
       <button
-        class="icon-btn"
-        :aria-label="$gettext('Toggle preview')"
-        @click="togglePreview"
+        :class="['icon-btn', { active: state.displayMode === 'rich' }]"
+        :aria-label="$gettext('Rich text')"
+        :title="$gettext('Rich text')"
+        @click="state.displayMode = 'rich'"
       >
-        <EyeOff v-if="isPreview" :size="18" />
-        <Eye v-else :size="18" />
+        <Type :size="18" />
       </button>
-      <button class="btn-save" :disabled="saving" @click="save">
+      <button
+        :class="['icon-btn', { active: state.displayMode === 'plain' }]"
+        :aria-label="$gettext('Plain text')"
+        :title="$gettext('Plain text')"
+        @click="state.displayMode = 'plain'"
+      >
+        <FileCode2 :size="18" />
+      </button>
+      <button
+        :class="['icon-btn', { active: isPreview }]"
+        :aria-label="$gettext('Preview')"
+        :title="$gettext('Preview')"
+        @click="state.displayMode = 'preview'"
+      >
+        <Eye :size="18" />
+      </button>
+      <button
+        v-if="state.zenMode"
+        class="icon-btn"
+        :aria-label="$gettext('Exit zen mode')"
+        :title="$gettext('Exit zen mode')"
+        @click="toggleZenMode()"
+      >
+        <Minimize2 :size="18" />
+      </button>
+      <button class="oc-button oc-button-primary btn-save" :disabled="saving" @click="save">
         {{ saving ? '…' : $gettext('Save') }}
       </button>
       <button

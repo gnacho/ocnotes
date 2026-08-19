@@ -22,6 +22,16 @@ async function loadNotes() {
   error.value = null
   try {
     state.notes = await api.listNotes()
+    if (!state.activeNote) {
+      const newest = [...state.notes].sort((a, b) => b.modified - a.modified)[0]
+      if (newest) {
+        state.activeNote = newest
+      } else {
+        const n = await api.createNote('New note', '', '')
+        state.notes = [n]
+        state.activeNote = n
+      }
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -119,7 +129,7 @@ function formatShort(ts: number): string {
 <template>
   <div class="note-list">
     <header class="note-list-header">
-      <button class="btn-new" :disabled="creating" @click="createNew">
+      <button class="oc-button oc-button-primary btn-new" :disabled="creating" @click="createNew">
         <Plus :size="16" />
         {{ $gettext('New note') }}
       </button>

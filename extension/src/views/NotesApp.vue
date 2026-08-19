@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { PanelLeft, StickyNote } from 'lucide-vue-next'
 import SidebarNav from '../components/SidebarNav.vue'
 import NoteList from '../components/NoteList.vue'
@@ -10,26 +10,14 @@ import { useNotesApi } from '../composables/api'
 
 const api = useNotesApi()
 
-const mediaDark = window.matchMedia('(prefers-color-scheme: dark)')
-const systemDark = ref(mediaDark.matches)
-mediaDark.addEventListener?.('change', (e) => {
-  systemDark.value = e.matches
-})
-
-const themeClass = computed(() =>
-  systemDark.value ? 'notes-app-dark' : 'notes-app-light',
-)
-
 function selectNote(note: Note) {
   state.activeNote = note
 }
 
-function deselectNote() {
-  state.activeNote = null
-}
-
 function handleDeleted() {
-  state.activeNote = null
+  const remaining = [...state.notes].sort((a, b) => b.modified - a.modified)
+  state.activeNote = remaining[0] ?? null
+  if (!state.activeNote) void newNote()
 }
 
 async function newNote() {
@@ -82,8 +70,6 @@ function onGlobalKey(e: KeyboardEvent) {
   } else if (e.key === 'Escape') {
     if (state.zenMode) {
       toggleZenMode()
-    } else if (state.activeNote) {
-      state.activeNote = null
     }
   }
 }
@@ -93,7 +79,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
 </script>
 
 <template>
-  <main :class="['notes-app', themeClass, { 'zen-mode': state.zenMode }]">
+  <main :class="['notes-app', { 'zen-mode': state.zenMode }]">
     <header class="notes-topbar">
       <button
         class="icon-btn"
@@ -124,7 +110,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
         <NoteEditor
           v-if="state.activeNote"
           :note="state.activeNote"
-          @back="deselectNote"
           @deleted="handleDeleted"
         />
         <div v-else class="editor-empty">

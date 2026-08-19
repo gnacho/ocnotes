@@ -63,7 +63,8 @@
     "Table": "Tabla",
     "Link": "Enlace",
     "Emoji": "Emoji",
-    "Attachments are not available yet": "Los adjuntos aún no están disponibles"
+    "Attachments are not available yet": "Los adjuntos aún no están disponibles",
+    "Exit zen mode": "Salir del modo zen"
   },
   "en": {
     "Notes": "Notes",
@@ -129,6 +130,7 @@
     "Table": "Table",
     "Link": "Link",
     "Emoji": "Emoji",
-    "Attachments are not available yet": "Attachments are not available yet"
+    "Attachments are not available yet": "Attachments are not available yet",
+    "Exit zen mode": "Exit zen mode"
   }
 }
