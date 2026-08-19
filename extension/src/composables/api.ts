@@ -1,91 +1,50 @@
+import { useClientService } from '@opencloud-eu/web-pkg'
 import type { Note } from '../stores/notes'
 
 const BASE = '/index.php/apps/notes/api/v1/'
 
-export async function fetchNotes(
-  category?: string,
-  exclude?: string[],
-  pruneBefore?: number,
-): Promise<Note[]> {
-  const params = new URLSearchParams()
-  if (category) params.set('category', category)
-  if (exclude) params.set('exclude', exclude.join(','))
-  if (pruneBefore) params.set('pruneBefore', String(pruneBefore))
-
-  const res = await fetch(`${BASE}notes?${params}`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+export interface Settings {
+  notesPath: string
+  fileSuffix: string
 }
 
-export async function fetchNote(id: number): Promise<Note> {
-  const res = await fetch(`${BASE}notes/${id}`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
-}
+export function useNotesApi() {
+  const client = useClientService()
 
-export async function createNote(payload: Partial<Note>): Promise<Note> {
-  const res = await fetch(`${BASE}notes`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      title: payload.title || 'New note',
-      content: payload.content || '',
-      category: payload.category || '',
-    }),
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
-}
-
-export async function updateNote(
-  id: number,
-  payload: Partial<Note>,
-  etag: string,
-): Promise<Note> {
-  const fields: Record<string, unknown> = {}
-  if (payload.title !== undefined) fields.title = payload.title
-  if (payload.content !== undefined) fields.content = payload.content
-  if (payload.category !== undefined) fields.category = payload.category
-  if (payload.favorite !== undefined) fields.favorite = payload.favorite
-
-  const res = await fetch(`${BASE}notes/${id}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      'If-Match': `"${etag}"`,
-    },
-    body: JSON.stringify(fields),
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    const err: Error & { note?: Note } = new Error(data.error || `HTTP ${res.status}`)
-    if (res.status === 412 && data.id) {
-      (err as any).note = data
-    }
-    throw err
+  async function get<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+    const usp = new URLSearchParams(params)
+    const qs = usp.toString()
+    const { data } = await client.httpAuthenticated.get(`${BASE}${path}${qs ? `?${qs}` : ''}`)
+    return data as T
   }
-  return res.json()
-}
 
-export async function deleteNote(id: number): Promise<void> {
-  const res = await fetch(`${BASE}notes/${id}`, { method: 'DELETE' })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-}
+  async function post<T>(path: string, body?: unknown): Promise<T> {
+    const { data } = await client.httpAuthenticated.post(`${BASE}${path}`, body ?? {})
+    return data as T
+  }
 
-export async function fetchSettings(): Promise<{ notesPath: string; fileSuffix: string }> {
-  const res = await fetch(`${BASE}settings`)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
-}
+  async function put<T>(path: string, body?: unknown): Promise<T> {
+    const { data } = await client.httpAuthenticated.put(`${BASE}${path}`, body ?? {})
+    return data as T
+  }
 
-export async function updateSettings(
-  updates: Record<string, string>,
-): Promise<Record<string, string>> {
-  const res = await fetch(`${BASE}settings`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updates),
-  })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  return res.json()
+  return {
+    listNotes: (category?: string, exclude?: string[], pruneBefore?: number) => {
+      const params: Record<string, string> = {}
+      if (category) params.category = category
+      if (exclude?.length) params.exclude = exclude.join(',')
+      if (pruneBefore) params.pruneBefore = String(pruneBefore)
+      return get<Note[]>('/notes', params)
+    },
+    getNote: (id: number) => get<Note>(`/notes/${id}`),
+    createNote: (title: string, content: string, category: string) =>
+      post<Note>('/notes', { title, content, category }),
+    updateNote: (id: number, payload: Partial<Note>, etag: string) =>
+      client.httpAuthenticated.put(`${BASE}notes/${id}`, payload, {
+        headers: { 'If-Match': `"${etag}"` },
+      }),
+    deleteNote: (id: number) => client.httpAuthenticated.delete(`${BASE}notes/${id}`),
+    getSettings: () => get<Settings>('/settings'),
+    updateSettings: (updates: Partial<Settings>) => put<Settings>('/settings', updates),
+  }
 }

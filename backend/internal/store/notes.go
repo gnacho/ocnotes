@@ -11,6 +11,25 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+const initialSchema = `CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL DEFAULT 'New note',
+    content TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
+    favorite INTEGER NOT NULL DEFAULT 0,
+    modified INTEGER NOT NULL,
+    etag TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notes_category ON notes(category);
+CREATE INDEX IF NOT EXISTS idx_notes_favorite ON notes(favorite);
+CREATE INDEX IF NOT EXISTS idx_notes_modified ON notes(modified);
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT ''
+);
+INSERT OR IGNORE INTO settings (key, value) VALUES ('notesPath', 'Notes');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('fileSuffix', '.md');`
+
 type Note struct {
 	ID       int64  `json:"id"`
 	Etag     string `json:"etag"`
@@ -44,23 +63,12 @@ func Open(dataDir string) (*Store, error) {
 	db.Exec("PRAGMA foreign_keys=ON")
 	db.Exec("PRAGMA busy_timeout=5000")
 
-	migrations, err := listMigrations()
-	if err != nil {
-		return nil, fmt.Errorf("list migrations: %w", err)
-	}
-	for _, m := range migrations {
-		sqlText, err := os.ReadFile(m)
-		if err != nil {
-			return nil, fmt.Errorf("read migration %s: %w", m, err)
+	for _, stmt := range splitStatements(initialSchema) {
+		if stmt == "" {
+			continue
 		}
-		for _, stmt := range splitStatements(string(sqlText)) {
-			stmt = strings.TrimSpace(stmt)
-			if stmt == "" {
-				continue
-			}
-			if _, err := db.Exec(stmt); err != nil {
-				return nil, fmt.Errorf("exec %s: %w", m, err)
-			}
+		if _, err := db.Exec(stmt); err != nil {
+			return nil, fmt.Errorf("exec schema: %w", err)
 		}
 	}
 
@@ -257,8 +265,6 @@ func (s *Store) UpdateSettings(newSettings Settings) (Settings, error) {
 
 	for key, value := range newSettings {
 		if value == "" {
-			// Empty values reset to default - need to know defaults
-			// For simplicity, just update with empty for known keys
 			switch key {
 			case "notesPath":
 				value = "Notes"
@@ -276,4 +282,16 @@ func (s *Store) UpdateSettings(newSettings Settings) (Settings, error) {
 	}
 
 	return current, nil
+}
+
+func splitStatements(sqlText string) []string {
+	stmts := strings.Split(sqlText, ";")
+	result := make([]string, 0, len(stmts))
+	for _, s := range stmts {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			result = append(result, s)
+		}
+	}
+	return result
 }

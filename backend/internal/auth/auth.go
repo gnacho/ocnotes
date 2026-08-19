@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -47,15 +46,18 @@ func (v *Validator) ValidateBasic(username, token string) (*ShadowUser, error) {
 		return &su, nil
 	}
 
-	resp, err := http.Get(v.graphURL)
+	req, err := http.NewRequest(http.MethodGet, v.graphURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("graph request: %w", err)
+	}
+	req.SetBasicAuth(username, token)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("graph request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	var body io.Reader = resp.Body
-	data, _ := io.ReadAll(body)
-	resp.Body = io.NopCloser(bytes.NewReader(data))
+	data, _ := io.ReadAll(resp.Body)
 
 	var graphUser struct {
 		ID                string `json:"id"`
