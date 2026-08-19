@@ -17,8 +17,8 @@ interface AppState {
   notes: Note[]
   activeNote: Note | null
   categories: string[]
+  pendingCategories: string[]
   currentCategory: string
-  filterFavorites: boolean
   searchQuery: string
   displayMode: DisplayMode
   zenMode: boolean
@@ -31,8 +31,8 @@ export const state = reactive<AppState>({
   notes: [],
   activeNote: null,
   categories: [],
+  pendingCategories: [],
   currentCategory: '',
-  filterFavorites: false,
   searchQuery: '',
   displayMode: 'rich',
   zenMode: false,
@@ -63,14 +63,6 @@ export function isZenMode() {
 
 export function setCurrentCategory(cat: string) {
   state.currentCategory = cat
-  state.filterFavorites = false
-}
-
-export function toggleFavoritesFilter() {
-  state.filterFavorites = !state.filterFavorites
-  if (state.filterFavorites) {
-    state.currentCategory = ''
-  }
 }
 
 export function setSearchQuery(q: string) {

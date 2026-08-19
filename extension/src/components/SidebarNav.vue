@@ -1,81 +1,222 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import type { Note } from '../stores/notes'
-import { state } from '../stores/notes'
+import { computed, ref, watch } from 'vue'
+import {
+  FolderPlus,
+  Maximize2,
+  Minimize2,
+  Settings,
+  Keyboard,
+  FileText,
+  Folder,
+} from 'lucide-vue-next'
+import { state, setCurrentCategory, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
-
-const emit = defineEmits<{
-  newNote: []
-}>()
+import ModalDialog from './ModalDialog.vue'
 
 const api = useNotesApi()
-const creating = ref(false)
-const error = ref<string | null>(null)
 
-async function handleNew() {
-  creating.value = true
-  error.value = null
-  try {
-    const n = await api.createNote('New note', '', state.currentCategory)
-    state.notes = [n, ...state.notes]
-    emit('newNote')
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    creating.value = false
-  }
-}
+const showNewCategory = ref(false)
+const showSettings = ref(false)
+const showShortcuts = ref(false)
+const newCategoryName = ref('')
+const categoryError = ref<string | null>(null)
 
-const categories = computed(() => {
+const settingsNotesPath = ref('')
+const settingsFileSuffix = ref('')
+const settingsView = ref<'rich' | 'plain' | 'preview'>('rich')
+const settingsError = ref<string | null>(null)
+const settingsSaved = ref(false)
+const settingsLoading = ref(false)
+
+const allCategories = computed(() => {
   const set = new Set<string>()
   for (const n of state.notes) {
-    if (n.category) set.add(n.category)
+    if (n.category) set.add(n.category.split('/')[0])
   }
-  return [...set].sort()
+  for (const c of state.pendingCategories) set.add(c)
+  return [...set].sort((a, b) => a.localeCompare(b))
 })
 
+function categoryCount(cat: string): number {
+  return state.notes.filter((n) => n.category && n.category.split('/')[0] === cat).length
+}
+
 const uncategorizedCount = computed(() => state.notes.filter((n) => !n.category).length)
-const favoritesCount = computed(() => state.notes.filter((n) => n.favorite).length)
+const totalCount = computed(() => state.notes.length)
+
+function createCategory() {
+  const name = newCategoryName.value.trim()
+  if (!name) return
+  if (allCategories.value.some((c) => c.toLowerCase() === name.toLowerCase())) {
+    categoryError.value = name
+    return
+  }
+  state.pendingCategories = [...state.pendingCategories, name]
+  setCurrentCategory(name)
+  showNewCategory.value = false
+  newCategoryName.value = ''
+  categoryError.value = null
+}
+
+watch(showNewCategory, (open) => {
+  if (open) {
+    newCategoryName.value = ''
+    categoryError.value = null
+  }
+})
+
+watch(showSettings, async (open) => {
+  if (!open) return
+  settingsError.value = null
+  settingsSaved.value = false
+  settingsLoading.value = true
+  try {
+    const s = await api.getSettings()
+    settingsNotesPath.value = s.notesPath
+    settingsFileSuffix.value = s.fileSuffix
+  } catch {
+    settingsError.value = 'load'
+  } finally {
+    settingsLoading.value = false
+  }
+})
+
+async function saveSettings() {
+  settingsError.value = null
+  settingsSaved.value = false
+  try {
+    await api.updateSettings({
+      notesPath: settingsNotesPath.value.trim(),
+      fileSuffix: settingsFileSuffix.value.trim(),
+    })
+    state.displayMode = settingsView.value
+    settingsSaved.value = true
+  } catch {
+    settingsError.value = 'save'
+  }
+}
 </script>
 
 <template>
   <nav class="sidebar-nav" aria-label="Notes navigation">
-    <button class="btn btn-new-note" :disabled="creating" @click="handleNew">
-      + {{ $gettext('New note') }}
-    </button>
-    <p v-if="error" class="error-msg">{{ error }}</p>
+    <div class="sidebar-top">
+      <button class="btn-new-category" @click="showNewCategory = true">
+        <FolderPlus :size="16" />
+        {{ $gettext('New category') }}
+      </button>
 
-    <input
-      v-model="state.searchQuery"
-      type="search"
-      :placeholder="$gettext('Search...')"
-      aria-label="Search"
-      class="search-input"
-    />
-
-    <section class="nav-section">
-      <h3>{{ $gettext('Categories') }}</h3>
-      <ul class="category-list">
-        <li :class="{ active: !state.currentCategory && !state.filterFavorites }">
-          <button @click="state.currentCategory = ''; state.filterFavorites = false">
-            {{ $gettext('Uncategorized') }} ({{ uncategorizedCount }})
+      <ul class="nav-list">
+        <li :class="{ active: state.currentCategory === '' }">
+          <button @click="setCurrentCategory('')">
+            <span class="nav-label"><FileText :size="15" /> {{ $gettext('All notes') }}</span>
+            <span class="count">{{ totalCount }}</span>
           </button>
         </li>
+      </ul>
+
+      <h3 class="nav-heading">{{ $gettext('Categories') }}</h3>
+      <ul class="nav-list">
         <li
-          v-for="cat in categories"
+          v-for="cat in allCategories"
           :key="cat"
           :class="{ active: state.currentCategory === cat }"
         >
-          <button @click="state.currentCategory = cat">{{ cat }}</button>
+          <button @click="setCurrentCategory(cat)">
+            <span class="nav-label"><Folder :size="15" /> {{ cat }}</span>
+            <span class="count">{{ categoryCount(cat) }}</span>
+          </button>
+        </li>
+        <li :class="{ active: state.currentCategory === '__none__' }">
+          <button @click="setCurrentCategory('__none__')">
+            <span class="nav-label">{{ $gettext('Uncategorized') }}</span>
+            <span class="count">{{ uncategorizedCount }}</span>
+          </button>
         </li>
       </ul>
-    </section>
+    </div>
 
-    <section class="nav-section">
-      <h3>{{ $gettext('Favorites') }}</h3>
-      <button :class="{ active: state.filterFavorites }" @click="state.filterFavorites = !state.filterFavorites">
-        ★ {{ $gettext('Favorites') }} ({{ favoritesCount }})
+    <div class="sidebar-bottom">
+      <button @click="toggleZenMode()">
+        <Maximize2 v-if="!state.zenMode" :size="15" />
+        <Minimize2 v-else :size="15" />
+        {{ $gettext('Zen mode') }}
       </button>
-    </section>
+      <button @click="showSettings = true">
+        <Settings :size="15" />
+        {{ $gettext('Settings') }}
+      </button>
+      <button @click="showShortcuts = true">
+        <Keyboard :size="15" />
+        {{ $gettext('Keyboard shortcuts') }}
+      </button>
+    </div>
+
+    <ModalDialog
+      v-if="showNewCategory"
+      :title="$gettext('New category')"
+      @close="showNewCategory = false"
+    >
+      <form class="modal-form" @submit.prevent="createCategory">
+        <input
+          v-model="newCategoryName"
+          type="text"
+          class="modal-input"
+              :placeholder="$gettext('Category name')"
+          autofocus
+        />
+        <p v-if="categoryError" class="error-msg">{{ categoryError }}</p>
+        <footer class="modal-actions">
+          <button type="button" class="btn-secondary" @click="showNewCategory = false">
+            {{ $gettext('Cancel') }}
+          </button>
+          <button type="submit" class="btn-primary">{{ $gettext('Create') }}</button>
+        </footer>
+      </form>
+    </ModalDialog>
+
+    <ModalDialog v-if="showSettings" :title="$gettext('Settings')" @close="showSettings = false">
+      <div v-if="settingsLoading" class="empty-msg">…</div>
+      <form v-else class="modal-form" @submit.prevent="saveSettings">
+        <label class="modal-label">
+          {{ $gettext('View type') }}
+          <select v-model="settingsView" class="modal-input">
+            <option value="rich">{{ $gettext('Rich text') }}</option>
+            <option value="plain">{{ $gettext('Plain text') }}</option>
+            <option value="preview">{{ $gettext('Preview') }}</option>
+          </select>
+        </label>
+        <label class="modal-label">
+          {{ $gettext('Notes folder') }}
+          <input v-model="settingsNotesPath" type="text" class="modal-input" />
+        </label>
+        <label class="modal-label">
+          {{ $gettext('File suffix') }}
+          <input v-model="settingsFileSuffix" type="text" class="modal-input" />
+        </label>
+        <p v-if="settingsSaved" class="ok-msg">{{ $gettext('Settings saved') }}</p>
+        <p v-else-if="settingsError" class="error-msg">{{ $gettext('Error') }}</p>
+        <footer class="modal-actions">
+          <button type="button" class="btn-secondary" @click="showSettings = false">
+            {{ $gettext('Close') }}
+          </button>
+          <button type="submit" class="btn-primary">{{ $gettext('Save') }}</button>
+        </footer>
+      </form>
+    </ModalDialog>
+
+    <ModalDialog
+      v-if="showShortcuts"
+      :title="$gettext('Keyboard shortcuts')"
+      @close="showShortcuts = false"
+    >
+      <dl class="shortcut-list">
+        <div><dt><kbd>Ctrl</kbd> + <kbd>N</kbd></dt><dd>{{ $gettext('New note') }}</dd></div>
+        <div><dt><kbd>Ctrl</kbd> + <kbd>F</kbd></dt><dd>{{ $gettext('Search notes') }}</dd></div>
+        <div><dt><kbd>Ctrl</kbd> + <kbd>S</kbd></dt><dd>{{ $gettext('Save note') }}</dd></div>
+        <div><dt><kbd>Ctrl</kbd> + <kbd>Z</kbd></dt><dd>{{ $gettext('Undo') }}</dd></div>
+        <div><dt><kbd>Ctrl</kbd> + <kbd>Y</kbd></dt><dd>{{ $gettext('Redo') }}</dd></div>
+        <div><dt><kbd>Esc</kbd></dt><dd>{{ $gettext('Back or exit zen mode') }}</dd></div>
+      </dl>
+    </ModalDialog>
   </nav>
 </template>
