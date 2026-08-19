@@ -93,6 +93,11 @@
 .btn-new-category {
   width: 100%;
   margin-bottom: 0.75rem;
+  background-image: linear-gradient(
+    to right in oklab,
+    var(--oc-role-secondary),
+    var(--oc-role-primary)
+  );
 }
 
 .nav-heading {
@@ -177,6 +182,11 @@
 
 .btn-new {
   width: 100%;
+  background-image: linear-gradient(
+    to right in oklab,
+    var(--oc-role-secondary),
+    var(--oc-role-primary)
+  );
 }
 
 .search-input {
