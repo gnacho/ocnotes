@@ -308,6 +308,15 @@
   background: var(--oc-role-primary);
 }
 
+/* Column 3 container: must flex-fill the remaining width */
+.notes-main {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* Column 3: editor */
 .note-editor {
   display: flex;
