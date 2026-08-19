@@ -6,6 +6,7 @@ import {
 } from '@opencloud-eu/web-pkg'
 import { urlJoin } from '@opencloud-eu/web-client'
 import '@opencloud-eu/extension-sdk/tailwind.css'
+import './styles.css'
 import { RouteRecordRaw } from 'vue-router'
 import { computed } from 'vue'
 import { useGettext } from 'vue3-gettext'
