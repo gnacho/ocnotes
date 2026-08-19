@@ -317,13 +317,53 @@ onMounted(() => window.addEventListener('click', closeEmoji))
 onBeforeUnmount(() => window.removeEventListener('click', closeEmoji))
 
 import MarkdownIt from 'markdown-it'
+import DOMPurify from 'dompurify'
 
 const md = new MarkdownIt({
-  html: false,
+  html: true,
   linkify: true,
   typographer: true,
   breaks: true,
 })
+
+DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  if (node.tagName === 'A') {
+    node.setAttribute('target', '_blank')
+    node.setAttribute('rel', 'noopener noreferrer')
+  }
+})
+
+const IMG_URL_RE = [
+  /!\[[^\]]*\]\((https?:\/\/[^)\s]+)[^)]*\)/g,
+  /src=["'](https?:\/\/[^"']+)["']/g,
+]
+
+function extractImageUrls(src: string): string[] {
+  const urls = new Set<string>()
+  for (const re of IMG_URL_RE) {
+    for (const m of src.matchAll(re)) {
+      if (m[1].includes('/api/v1/img?')) continue
+      urls.add(m[1])
+    }
+  }
+  return [...urls].slice(0, 32)
+}
+
+async function buildPreview(src: string): Promise<string> {
+  let text = src
+  const urls = extractImageUrls(src)
+  if (urls.length) {
+    try {
+      const map = await api.signImages(urls)
+      for (const [u, proxied] of Object.entries(map)) {
+        text = text.split(u).join(proxied)
+      }
+    } catch {
+      // sin firma las imágenes no cargarán, pero el resto del markdown sí
+    }
+  }
+  return DOMPurify.sanitize(md.render(text), { ADD_ATTR: ['target'] })
+}
 
 const defaultLink =
   md.renderer.rules.link_open ||
@@ -335,9 +375,22 @@ md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
   return defaultLink(tokens, idx, options, env, self)
 }
 
-function renderPreview(src: string): string {
-  return md.render(src)
-}
+const previewHtml = ref('')
+
+let previewTimer: number | undefined
+watch(
+  [content, isPreview],
+  ([c, p]) => {
+    if (!p) return
+    window.clearTimeout(previewTimer)
+    previewTimer = window.setTimeout(() => {
+      void buildPreview(c).then((h) => {
+        previewHtml.value = h
+      })
+    }, 250)
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -497,7 +550,7 @@ function renderPreview(src: string): string {
         class="content-textarea"
         @keydown="onKeydown"
       />
-      <div v-else :style="editorStyle" class="preview-pane" v-html="renderPreview(content)" />
+      <div v-else :style="editorStyle" class="preview-pane" v-html="previewHtml" />
       <p v-if="error" class="error-msg">{{ error }}</p>
     </main>
   </div>
