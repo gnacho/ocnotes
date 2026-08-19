@@ -132,13 +132,3 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
     </div>
   </main>
 </template>
-
-<style scoped>
-.notes-main {
-  flex: 1;
-  overflow: hidden;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-</style>

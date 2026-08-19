@@ -31,9 +31,13 @@ const isDark = useIsDark()
 
 const saveClasses = computed(() => [
   'btn-save',
+  'shadow-md',
+  'hover:brightness-110',
+  'duration-150',
+  'ease-out',
   isDark.value
-    ? 'oc-button-filled oc-button-primary-container'
-    : 'oc-button-filled oc-button-primary',
+    ? 'oc-button-filled oc-button-primary-container !bg-gradient-to-r !from-role-secondary-container !to-role-primary-container'
+    : 'oc-button-filled oc-button-primary !bg-gradient-to-r !from-role-secondary !to-role-primary',
 ])
 
 const emit = defineEmits<{
