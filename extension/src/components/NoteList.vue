@@ -5,8 +5,22 @@ import { Plus, Star } from 'lucide-vue-next'
 import type { Note } from '../stores/notes'
 import { state } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
+import { useIsDark } from '../composables/theme'
 
 const { $gettext } = useGettext()
+const isDark = useIsDark()
+
+const createClasses = computed(() => [
+  'btn-new',
+  'shadow-md',
+  'duration-150',
+  'ease-out',
+  'hover:brightness-110',
+  'w-full',
+  isDark.value
+    ? 'oc-button-filled oc-button-primary-container !bg-gradient-to-r !from-role-secondary-container !to-role-primary-container'
+    : 'oc-button-filled oc-button-primary !bg-gradient-to-r !from-role-secondary !to-role-primary',
+])
 
 const emit = defineEmits<{
   selectNote: [note: Note]
@@ -129,7 +143,7 @@ function formatShort(ts: number): string {
 <template>
   <div class="note-list">
     <header class="note-list-header">
-      <button class="oc-button oc-button-primary oc-button-filled btn-new" :disabled="creating" @click="createNew">
+      <button :class="createClasses" :disabled="creating" @click="createNew">
         <Plus :size="16" />
         {{ $gettext('New note') }}
       </button>

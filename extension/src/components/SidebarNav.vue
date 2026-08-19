@@ -11,9 +11,23 @@ import {
 } from 'lucide-vue-next'
 import { state, setCurrentCategory, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
+import { useIsDark } from '../composables/theme'
 import ModalDialog from './ModalDialog.vue'
 
 const api = useNotesApi()
+const isDark = useIsDark()
+
+const createCategoryClasses = computed(() => [
+  'btn-new-category',
+  'shadow-md',
+  'duration-150',
+  'ease-out',
+  'hover:brightness-110',
+  'w-full',
+  isDark.value
+    ? 'oc-button-filled oc-button-primary-container !bg-gradient-to-r !from-role-secondary-container !to-role-primary-container'
+    : 'oc-button-filled oc-button-primary !bg-gradient-to-r !from-role-secondary !to-role-primary',
+])
 
 const showNewCategory = ref(false)
 const showSettings = ref(false)
@@ -110,7 +124,7 @@ async function saveSettings() {
 <template>
   <nav class="sidebar-nav" aria-label="Notes navigation">
     <div class="sidebar-top">
-      <button class="oc-button oc-button-primary oc-button-filled btn-new-category" @click="showNewCategory = true">
+      <button :class="createCategoryClasses" @click="showNewCategory = true">
         <FolderPlus :size="16" />
         {{ $gettext('New category') }}
       </button>
