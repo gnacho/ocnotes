@@ -328,7 +328,7 @@ function renderPreview(md: string): string {
       </select>
       <span class="editor-spacer" />
       <button
-        class="icon-btn"
+        class="oc-button oc-button-raw icon-btn"
         :class="{ starred: props.note.favorite }"
         :aria-label="props.note.favorite ? $gettext('Unstar') : $gettext('Star')"
         @click="toggleFavorite"
@@ -336,7 +336,7 @@ function renderPreview(md: string): string {
         <Star :size="18" />
       </button>
       <button
-        :class="['icon-btn', { active: state.displayMode === 'rich' }]"
+        :class="['oc-button oc-button-raw icon-btn', { active: state.displayMode === 'rich' }]"
         :aria-label="$gettext('Rich text')"
         :title="$gettext('Rich text')"
         @click="state.displayMode = 'rich'"
@@ -344,7 +344,7 @@ function renderPreview(md: string): string {
         <Type :size="18" />
       </button>
       <button
-        :class="['icon-btn', { active: state.displayMode === 'plain' }]"
+        :class="['oc-button oc-button-raw icon-btn', { active: state.displayMode === 'plain' }]"
         :aria-label="$gettext('Plain text')"
         :title="$gettext('Plain text')"
         @click="state.displayMode = 'plain'"
@@ -352,7 +352,7 @@ function renderPreview(md: string): string {
         <FileCode2 :size="18" />
       </button>
       <button
-        :class="['icon-btn', { active: isPreview }]"
+        :class="['oc-button oc-button-raw icon-btn', { active: isPreview }]"
         :aria-label="$gettext('Preview')"
         :title="$gettext('Preview')"
         @click="state.displayMode = 'preview'"
@@ -361,18 +361,18 @@ function renderPreview(md: string): string {
       </button>
       <button
         v-if="state.zenMode"
-        class="icon-btn"
+        class="oc-button oc-button-raw icon-btn"
         :aria-label="$gettext('Exit zen mode')"
         :title="$gettext('Exit zen mode')"
         @click="toggleZenMode()"
       >
         <Minimize2 :size="18" />
       </button>
-      <button class="oc-button oc-button-primary btn-save" :disabled="saving" @click="save">
+      <button class="oc-button oc-button-primary oc-button-filled btn-save" :disabled="saving" @click="save">
         {{ saving ? '…' : $gettext('Save') }}
       </button>
       <button
-        class="icon-btn danger"
+        class="oc-button oc-button-raw icon-btn danger"
         :aria-label="$gettext('Delete')"
         @click="remove"
       >
@@ -381,59 +381,59 @@ function renderPreview(md: string): string {
     </header>
 
     <div v-if="!isPreview" class="md-toolbar">
-      <button class="md-btn" :disabled="!canUndo" :title="$gettext('Undo')" @click="undo">
+      <button class="oc-button oc-button-raw md-btn" :disabled="!canUndo" :title="$gettext('Undo')" @click="undo">
         <Undo2 :size="16" />
       </button>
-      <button class="md-btn" :disabled="!canRedo" :title="$gettext('Redo')" @click="redo">
+      <button class="oc-button oc-button-raw md-btn" :disabled="!canRedo" :title="$gettext('Redo')" @click="redo">
         <Redo2 :size="16" />
       </button>
       <span class="md-sep" />
-      <button class="md-btn" :title="$gettext('Bold')" @click="wrap('**', '**', 'text')">
+      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Bold')" @click="wrap('**', '**', 'text')">
         <Bold :size="16" />
       </button>
-      <button class="md-btn" :title="$gettext('Italic')" @click="wrap('*', '*', 'text')">
+      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Italic')" @click="wrap('*', '*', 'text')">
         <Italic :size="16" />
       </button>
       <button
-        class="md-btn"
+        class="oc-button oc-button-raw md-btn"
         :title="$gettext('Strikethrough')"
         @click="wrap('~~', '~~', 'text')"
       >
         <Strikethrough :size="16" />
       </button>
-      <button class="md-btn" :title="$gettext('Heading')" @click="toggleLinePrefix('## ')">
+      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Heading')" @click="toggleLinePrefix('## ')">
         <Heading2 :size="16" />
       </button>
       <span class="md-sep" />
-      <button class="md-btn" :title="$gettext('Bulleted list')" @click="toggleLinePrefix('- ')">
+      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Bulleted list')" @click="toggleLinePrefix('- ')">
         <List :size="16" />
       </button>
       <button
-        class="md-btn"
+        class="oc-button oc-button-raw md-btn"
         :title="$gettext('Numbered list')"
         @click="toggleLinePrefix('1. ')"
       >
         <ListOrdered :size="16" />
       </button>
-      <button class="md-btn" :title="$gettext('Quote')" @click="toggleLinePrefix('> ')">
+      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Quote')" @click="toggleLinePrefix('> ')">
         <TextQuote :size="16" />
       </button>
-      <button class="md-btn" :title="$gettext('Code')" @click="wrap('`', '`', 'code')">
+      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Code')" @click="wrap('`', '`', 'code')">
         <Code :size="16" />
       </button>
       <span class="md-sep" />
-      <button class="md-btn" :title="$gettext('Table')" @click="insertBlock(TABLE)">
+      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Table')" @click="insertBlock(TABLE)">
         <Table :size="16" />
       </button>
       <button
-        class="md-btn"
+        class="oc-button oc-button-raw md-btn"
         :title="$gettext('Link')"
         @click="wrap('[', '](url)', 'text')"
       >
         <Link2 :size="16" />
       </button>
       <button
-        class="md-btn"
+        class="oc-button oc-button-raw md-btn"
         disabled
         :title="$gettext('Attachments are not available yet')"
       >
@@ -441,7 +441,7 @@ function renderPreview(md: string): string {
       </button>
       <div class="emoji-wrap">
         <button
-          class="md-btn"
+          class="oc-button oc-button-raw md-btn"
           :title="$gettext('Emoji')"
           @click.stop="showEmoji = !showEmoji"
         >

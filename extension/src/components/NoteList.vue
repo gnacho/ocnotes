@@ -129,7 +129,7 @@ function formatShort(ts: number): string {
 <template>
   <div class="note-list">
     <header class="note-list-header">
-      <button class="oc-button oc-button-primary btn-new" :disabled="creating" @click="createNew">
+      <button class="oc-button oc-button-primary oc-button-filled btn-new" :disabled="creating" @click="createNew">
         <Plus :size="16" />
         {{ $gettext('New note') }}
       </button>

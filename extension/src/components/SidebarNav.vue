@@ -110,7 +110,7 @@ async function saveSettings() {
 <template>
   <nav class="sidebar-nav" aria-label="Notes navigation">
     <div class="sidebar-top">
-      <button class="oc-button oc-button-primary btn-new-category" @click="showNewCategory = true">
+      <button class="oc-button oc-button-primary oc-button-filled btn-new-category" @click="showNewCategory = true">
         <FolderPlus :size="16" />
         {{ $gettext('New category') }}
       </button>
@@ -176,10 +176,10 @@ async function saveSettings() {
         />
         <p v-if="categoryError" class="error-msg">{{ categoryError }}</p>
         <footer class="modal-actions">
-          <button type="button" class="oc-button oc-button-outline btn-secondary" @click="showNewCategory = false">
+          <button type="button" class="oc-button oc-button-outline" @click="showNewCategory = false">
             {{ $gettext('Cancel') }}
           </button>
-          <button type="submit" class="oc-button oc-button-primary btn-primary">{{ $gettext('Create') }}</button>
+          <button type="submit" class="oc-button oc-button-primary oc-button-filled">{{ $gettext('Create') }}</button>
         </footer>
       </form>
     </ModalDialog>
@@ -223,10 +223,10 @@ async function saveSettings() {
         <p v-if="settingsSaved" class="ok-msg">{{ $gettext('Settings saved') }}</p>
         <p v-else-if="settingsError" class="error-msg">{{ $gettext('Error') }}</p>
         <footer class="modal-actions">
-          <button type="button" class="oc-button oc-button-outline btn-secondary" @click="showSettings = false">
+          <button type="button" class="oc-button oc-button-outline" @click="showSettings = false">
             {{ $gettext('Close') }}
           </button>
-          <button type="submit" class="oc-button oc-button-primary btn-primary">{{ $gettext('Save') }}</button>
+          <button type="submit" class="oc-button oc-button-primary oc-button-filled">{{ $gettext('Save') }}</button>
         </footer>
       </form>
     </ModalDialog>

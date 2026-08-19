@@ -13,7 +13,7 @@ const emit = defineEmits<{
     <div class="modal" role="dialog" aria-modal="true" :aria-label="title">
       <header class="modal-header">
         <h2>{{ title }}</h2>
-        <button class="icon-btn" :aria-label="$gettext('Close')" @click="emit('close')">×</button>
+        <button class="oc-button oc-button-raw icon-btn" :aria-label="$gettext('Close')" @click="emit('close')">×</button>
       </header>
       <div class="modal-body">
         <slot />

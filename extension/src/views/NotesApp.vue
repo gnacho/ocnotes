@@ -93,7 +93,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
   <main :class="['notes-app', { 'zen-mode': state.zenMode }]">
     <header class="notes-topbar">
       <button
-        class="icon-btn"
+        class="oc-button oc-button-raw icon-btn"
         :aria-label="$gettext('Toggle sidebar')"
         @click="state.sidebarOpen = !state.sidebarOpen"
       >
