@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
+  AlignLeft,
   Bold,
   Code,
   Eye,
-  FileCode2,
   Heading2,
   Italic,
   Link2,
@@ -25,6 +25,16 @@ import {
 import type { Note } from '../stores/notes'
 import { state, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
+import { useIsDark } from '../composables/theme'
+
+const isDark = useIsDark()
+
+const saveClasses = computed(() => [
+  'btn-save',
+  isDark.value
+    ? 'oc-button-filled oc-button-primary-container'
+    : 'oc-button-filled oc-button-primary',
+])
 
 const emit = defineEmits<{
   deleted: [id: number]
@@ -349,7 +359,7 @@ function renderPreview(md: string): string {
         :title="$gettext('Plain text')"
         @click="state.displayMode = 'plain'"
       >
-        <FileCode2 :size="18" />
+        <AlignLeft :size="18" />
       </button>
       <button
         :class="['oc-button oc-button-raw icon-btn', { active: isPreview }]"
@@ -368,7 +378,7 @@ function renderPreview(md: string): string {
       >
         <Minimize2 :size="18" />
       </button>
-      <button class="oc-button oc-button-primary oc-button-filled btn-save" :disabled="saving" @click="save">
+      <button :class="saveClasses" :disabled="saving" @click="save">
         {{ saving ? '…' : $gettext('Save') }}
       </button>
       <button

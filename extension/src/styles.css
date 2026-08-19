@@ -331,6 +331,18 @@
   padding: calc(var(--spacing, 4px) * 1.25);
 }
 
+.icon-btn svg,
+.md-btn svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+
+.md-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 .icon-btn.starred {
   color: #d97706;
 }
