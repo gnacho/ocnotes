@@ -379,7 +379,7 @@
   display: flex;
   align-items: center;
   gap: 0.1rem;
-  padding: 0.25rem 0.85rem;
+  padding: 0.25rem max(0.85rem, calc((100% - 1100px) / 2));
   border-bottom: 1px solid var(--oc-role-outline-variant);
   flex-wrap: wrap;
   flex-shrink: 0;
@@ -437,7 +437,10 @@
 /* Editor body */
 .editor-body {
   flex: 1;
-  padding: 0.75rem 1rem;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0.75rem 1.5rem;
   overflow: hidden;
   display: flex;
   flex-direction: column;
