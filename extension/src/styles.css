@@ -96,7 +96,9 @@
   justify-content: center;
   gap: 0.5rem;
   width: 100%;
+  padding-block: 0.55rem;
   margin-bottom: 0.75rem;
+  font-weight: 500;
 }
 
 .nav-heading {
@@ -185,6 +187,8 @@
   justify-content: center;
   gap: 0.5rem;
   width: 100%;
+  padding-block: 0.55rem;
+  font-weight: 600;
 }
 
 .search-input {

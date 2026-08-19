@@ -34,7 +34,10 @@ func main() {
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           server.Router(),
-		ReadHeaderTimeout: 10 * 1024,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	idle := make(chan os.Signal, 1)
