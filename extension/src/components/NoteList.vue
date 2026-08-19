@@ -10,6 +10,7 @@ const emit = defineEmits<{
 
 const api = useNotesApi()
 const loading = ref(false)
+const creating = ref(false)
 const error = ref<string | null>(null)
 
 async function loadNotes() {
@@ -21,6 +22,20 @@ async function loadNotes() {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
+  }
+}
+
+async function createNew() {
+  creating.value = true
+  error.value = null
+  try {
+    const n = await api.createNote('New note', '', state.currentCategory)
+    state.notes = [n, ...state.notes]
+    emit('selectNote', n)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    creating.value = false
   }
 }
 
@@ -57,17 +72,7 @@ const categories = computed(() => {
 <template>
   <div class="note-list">
     <header class="note-list-header">
-      <button
-        class="btn-new"
-        @click="
-          api
-            .createNote('New note', '', state.currentCategory)
-            .then((n) => {
-              state.notes = [n, ...state.notes]
-              emit('selectNote', n)
-            })
-        "
-      >
+      <button class="btn-new" :disabled="creating" @click="createNew">
         + {{ $gettext('New note') }}
       </button>
     </header>

@@ -1,7 +1,7 @@
 import { useClientService } from '@opencloud-eu/web-pkg'
 import type { Note } from '../stores/notes'
 
-const BASE = '/index.php/apps/notes/api/v1/'
+const BASE = '/index.php/apps/notes/api/v1'
 
 export interface Settings {
   notesPath: string
@@ -40,10 +40,10 @@ export function useNotesApi() {
     createNote: (title: string, content: string, category: string) =>
       post<Note>('/notes', { title, content, category }),
     updateNote: (id: number, payload: Partial<Note>, etag: string) =>
-      client.httpAuthenticated.put(`${BASE}notes/${id}`, payload, {
+      client.httpAuthenticated.put(`${BASE}/notes/${id}`, payload, {
         headers: { 'If-Match': `"${etag}"` },
       }),
-    deleteNote: (id: number) => client.httpAuthenticated.delete(`${BASE}notes/${id}`),
+    deleteNote: (id: number) => client.httpAuthenticated.delete(`${BASE}/notes/${id}`),
     getSettings: () => get<Settings>('/settings'),
     updateSettings: (updates: Partial<Settings>) => put<Settings>('/settings', updates),
   }

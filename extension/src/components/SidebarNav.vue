@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Note } from '../stores/notes'
 import { state } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
@@ -9,11 +9,21 @@ const emit = defineEmits<{
 }>()
 
 const api = useNotesApi()
+const creating = ref(false)
+const error = ref<string | null>(null)
 
 async function handleNew() {
-  const n = await api.createNote('New note', '', state.currentCategory)
-  state.notes = [n, ...state.notes]
-  emit('newNote')
+  creating.value = true
+  error.value = null
+  try {
+    const n = await api.createNote('New note', '', state.currentCategory)
+    state.notes = [n, ...state.notes]
+    emit('newNote')
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    creating.value = false
+  }
 }
 
 const categories = computed(() => {
@@ -30,7 +40,10 @@ const favoritesCount = computed(() => state.notes.filter((n) => n.favorite).leng
 
 <template>
   <nav class="sidebar-nav" aria-label="Notes navigation">
-    <button class="btn btn-new-note" @click="handleNew">+ {{ $gettext('New note') }}</button>
+    <button class="btn btn-new-note" :disabled="creating" @click="handleNew">
+      + {{ $gettext('New note') }}
+    </button>
+    <p v-if="error" class="error-msg">{{ error }}</p>
 
     <input
       v-model="state.searchQuery"
