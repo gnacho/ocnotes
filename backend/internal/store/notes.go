@@ -1,4 +1,3 @@
-// Package store handles SQLite database access for ocnotes.
 package store
 
 import (
@@ -6,14 +5,31 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
 
-// Note represents a Nextcloud-compatible note.
+const initialSchema = `CREATE TABLE IF NOT EXISTS notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL DEFAULT 'New note',
+    content TEXT NOT NULL DEFAULT '',
+    category TEXT NOT NULL DEFAULT '',
+    favorite INTEGER NOT NULL DEFAULT 0,
+    modified INTEGER NOT NULL,
+    etag TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_notes_category ON notes(category);
+CREATE INDEX IF NOT EXISTS idx_notes_favorite ON notes(favorite);
+CREATE INDEX IF NOT EXISTS idx_notes_modified ON notes(modified);
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL DEFAULT ''
+);
+INSERT OR IGNORE INTO settings (key, value) VALUES ('notesPath', 'Notes');
+INSERT OR IGNORE INTO settings (key, value) VALUES ('fileSuffix', '.md');`
+
 type Note struct {
 	ID       int64  `json:"id"`
 	Etag     string `json:"etag"`
@@ -25,13 +41,12 @@ type Note struct {
 	Favorite bool   `json:"favorite"`
 }
 
-// Store holds the open database and serves note operations.
 type Store struct {
 	db *sql.DB
 }
 
-// Open opens or creates the Notes database at dataDir/notes.db. Creates tables
-// if missing, runs all pending migrations, and sets PRAGMAs.
+type Settings map[string]string
+
 func Open(dataDir string) (*Store, error) {
 	path := filepath.Join(dataDir, "notes.db")
 	if err := os.MkdirAll(dataDir, 0750); err != nil {
@@ -42,42 +57,28 @@ func Open(dataDir string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open: %w", err)
 	}
-	if err := db.SetMaxOpenConns(1); err != nil {
-		return nil, fmt.Errorf("max conns: %w", err)
-	}
-
-	db.Exec("PRAGMA journal_mode=WAL")
+	db.SetMaxOpenConns(1)
+	_, _ = db.Exec("PRAGMA journal_mode=WAL")
 	db.Exec("PRAGMA synchronous=NORMAL")
 	db.Exec("PRAGMA foreign_keys=ON")
 	db.Exec("PRAGMA busy_timeout=5000")
 
-	migrations, err := listMigrations(db)
-	if err != nil {
-		return nil, fmt.Errorf("list migrations: %w", err)
-	}
-	for _, m := range migrations {
-		sqlText, err := os.ReadFile(m)
-		if err != nil {
-			return nil, fmt.Errorf("read migration %s: %w", m, err)
+	for _, stmt := range splitStatements(initialSchema) {
+		if stmt == "" {
+			continue
 		}
-		for _, stmt := range splitStatements(string(sqlText)) {
-			stmt = strings.TrimSpace(stmt)
-			if stmt == "" {
-				continue
-			}
-			if _, err := db.Exec(stmt); err != nil {
-				return nil, fmt.Errorf("exec %s: %w", m, err)
-			}
+		if _, err := db.Exec(stmt); err != nil {
+			return nil, fmt.Errorf("exec schema: %w", err)
 		}
 	}
 
 	return &Store{db: db}, nil
 }
 
-// Close closes the database.
-func (s *Store) Close() error { return s.db.Close() }
+func (s *Store) Close() error {
+	return s.db.Close()
+}
 
-// CreateNote inserts a new note and returns it with generated id + etag.
 func (s *Store) CreateNote(title, content, category string, modified int64) (*Note, error) {
 	tag := fmt.Sprintf("%x", modified)
 	note := &Note{
@@ -88,6 +89,7 @@ func (s *Store) CreateNote(title, content, category string, modified int64) (*No
 		Modified: modified,
 		Etag:     tag,
 	}
+
 	res, err := s.db.Exec(
 		`INSERT INTO notes (title, content, category, favorite, modified, etag) VALUES (?,?,?,?,?,?)`,
 		title, content, category, 0, modified, tag,
@@ -97,10 +99,10 @@ func (s *Store) CreateNote(title, content, category string, modified int64) (*No
 	}
 	id, _ := res.LastInsertId()
 	note.ID = id
+
 	return note, nil
 }
 
-// GetNote returns a single note by ID or sql.ErrNoRows.
 func (s *Store) GetNote(id int64) (*Note, error) {
 	row := s.db.QueryRow(
 		`SELECT id, etag, modified, title, category, content, favorite FROM notes WHERE id=?`, id,
@@ -108,19 +110,31 @@ func (s *Store) GetNote(id int64) (*Note, error) {
 	return scanNote(row)
 }
 
-// ListNotes returns up to limit notes ordered by favorite DESC, modified DESC.
-// If category is non-empty, only notes in that category are returned.
-func (s *Store) ListNotes(category string, exclude []string, limit int) ([]Note, error) {
+func (s *Store) ListNotes(category string, exclude []string, limit int, pruneBefore int64) ([]Note, error) {
 	query := `SELECT id, etag, modified, title, category, content, favorite FROM notes`
 	var args []interface{}
 	where := ""
 
 	if category != "" {
-		where += " WHERE category=?"
+		where += " AND category=?"
 		args = append(args, category)
 	}
 
-	query += where + ` ORDER BY favorite DESC, modified DESC`
+	if pruneBefore > 0 {
+		if where == "" {
+			where += " WHERE"
+		} else {
+			where += " AND"
+		}
+		where += " modified<?"
+		args = append(args, pruneBefore)
+	}
+
+	if where != "" {
+		query += where
+	}
+
+	query += ` ORDER BY favorite DESC, modified DESC`
 	if limit > 0 {
 		query += ` LIMIT ?`
 		args = append(args, limit)
@@ -143,10 +157,7 @@ func (s *Store) ListNotes(category string, exclude []string, limit int) ([]Note,
 	return notes, rows.Err()
 }
 
-// UpdateNote updates a note's fields by ID. Returns the updated note or
-// sql.ErrNoRows if not found.
-func (s *Store) UpdateNote(id int64, title, content, category *string, favorite *bool, modified int64) (*Note, error) {
-	// Read existing first for etag generation.
+func (s *Store) UpdateNote(id int64, title *string, content *string, category *string, favorite *bool, modified int64) (*Note, error) {
 	existing, err := s.GetNote(id)
 	if err != nil {
 		return nil, err
@@ -181,16 +192,15 @@ func (s *Store) UpdateNote(id int64, title, content, category *string, favorite 
 	if err != nil {
 		return nil, err
 	}
+
 	return existing, nil
 }
 
-// DeleteNote deletes a note by ID. Returns sql.ErrNoRows if not found.
 func (s *Store) DeleteNote(id int64) error {
 	_, err := s.db.Exec(`DELETE FROM notes WHERE id=?`, id)
 	return err
 }
 
-// SetFavorite toggles the favorite flag for a note.
 func (s *Store) SetFavorite(id int64, favorite bool) (*Note, error) {
 	favInt := 0
 	if favorite {
@@ -207,8 +217,6 @@ func (s *Store) SetFavorite(id int64, favorite bool) (*Note, error) {
 	return s.GetNote(id)
 }
 
-// SearchNotes searches title and content for the query string (case insensitive).
-// Returns up to max results ordered by modified DESC.
 func (s *Store) SearchNotes(query string, maxResults int) ([]Note, error) {
 	pattern := "%" + query + "%"
 	rows, err := s.db.Query(
@@ -229,4 +237,61 @@ func (s *Store) SearchNotes(query string, maxResults int) ([]Note, error) {
 		notes = append(notes, *n)
 	}
 	return notes, rows.Err()
+}
+
+func (s *Store) GetSettings() (Settings, error) {
+	settings := make(Settings)
+	rows, err := s.db.Query(`SELECT key, value FROM settings`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		settings[key] = value
+	}
+	return settings, rows.Err()
+}
+
+func (s *Store) UpdateSettings(newSettings Settings) (Settings, error) {
+	current, err := s.GetSettings()
+	if err != nil {
+		return nil, err
+	}
+
+	for key, value := range newSettings {
+		if value == "" {
+			switch key {
+			case "notesPath":
+				value = "Notes"
+			case "fileSuffix":
+				value = ".md"
+			default:
+				value = ""
+			}
+		}
+		current[key] = value
+		_, err := s.db.Exec(`INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)`, key, value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return current, nil
+}
+
+func splitStatements(sqlText string) []string {
+	stmts := strings.Split(sqlText, ";")
+	result := make([]string, 0, len(stmts))
+	for _, s := range stmts {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			result = append(result, s)
+		}
+	}
+	return result
 }
