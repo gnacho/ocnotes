@@ -74,7 +74,18 @@ function onGlobalKey(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onGlobalKey))
+onMounted(() => {
+  window.addEventListener('keydown', onGlobalKey)
+  void api
+    .getSettings()
+    .then((s) => {
+      const fonts = ['default', 'sans', 'serif', 'mono']
+      if (fonts.includes(s.editorFont)) state.editorFont = s.editorFont
+      const size = Number.parseInt(s.editorFontSize, 10)
+      if (Number.isFinite(size) && size >= 12 && size <= 22) state.editorFontSize = size
+    })
+    .catch(() => {})
+})
 onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
 </script>
 

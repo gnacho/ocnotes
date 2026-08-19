@@ -64,7 +64,13 @@
     "Link": "Enlace",
     "Emoji": "Emoji",
     "Attachments are not available yet": "Los adjuntos aún no están disponibles",
-    "Exit zen mode": "Salir del modo zen"
+    "Exit zen mode": "Salir del modo zen",
+    "Editor font": "Fuente del editor",
+    "Font size": "Tamaño de fuente",
+    "Default": "Predeterminada",
+    "Sans": "Sans",
+    "Serif": "Serif",
+    "Mono": "Mono"
   },
   "en": {
     "Notes": "Notes",
@@ -131,6 +137,12 @@
     "Link": "Link",
     "Emoji": "Emoji",
     "Attachments are not available yet": "Attachments are not available yet",
-    "Exit zen mode": "Exit zen mode"
+    "Exit zen mode": "Exit zen mode",
+    "Editor font": "Editor font",
+    "Font size": "Font size",
+    "Default": "Default",
+    "Sans": "Sans",
+    "Serif": "Serif",
+    "Mono": "Mono"
   }
 }

@@ -24,6 +24,8 @@ const categoryError = ref<string | null>(null)
 const settingsNotesPath = ref('')
 const settingsFileSuffix = ref('')
 const settingsView = ref<'rich' | 'plain' | 'preview'>('rich')
+const settingsFont = ref('default')
+const settingsFontSize = ref(15)
 const settingsError = ref<string | null>(null)
 const settingsSaved = ref(false)
 const settingsLoading = ref(false)
@@ -74,6 +76,10 @@ watch(showSettings, async (open) => {
     const s = await api.getSettings()
     settingsNotesPath.value = s.notesPath
     settingsFileSuffix.value = s.fileSuffix
+    const fonts = ['default', 'sans', 'serif', 'mono']
+    if (fonts.includes(s.editorFont)) settingsFont.value = s.editorFont
+    const size = Number.parseInt(s.editorFontSize ?? '', 10)
+    if (Number.isFinite(size) && size >= 12 && size <= 22) settingsFontSize.value = size
   } catch {
     settingsError.value = 'load'
   } finally {
@@ -88,8 +94,12 @@ async function saveSettings() {
     await api.updateSettings({
       notesPath: settingsNotesPath.value.trim(),
       fileSuffix: settingsFileSuffix.value.trim(),
+      editorFont: settingsFont.value,
+      editorFontSize: String(settingsFontSize.value),
     })
     state.displayMode = settingsView.value
+    state.editorFont = settingsFont.value
+    state.editorFontSize = settingsFontSize.value
     settingsSaved.value = true
   } catch {
     settingsError.value = 'save'
@@ -183,6 +193,23 @@ async function saveSettings() {
             <option value="rich">{{ $gettext('Rich text') }}</option>
             <option value="plain">{{ $gettext('Plain text') }}</option>
             <option value="preview">{{ $gettext('Preview') }}</option>
+          </select>
+        </label>
+        <label class="modal-label">
+          {{ $gettext('Editor font') }}
+          <select v-model="settingsFont" class="modal-input">
+            <option value="default">{{ $gettext('Default') }}</option>
+            <option value="sans">{{ $gettext('Sans') }}</option>
+            <option value="serif">{{ $gettext('Serif') }}</option>
+            <option value="mono">{{ $gettext('Mono') }}</option>
+          </select>
+        </label>
+        <label class="modal-label">
+          {{ $gettext('Font size') }}
+          <select v-model.number="settingsFontSize" class="modal-input">
+            <option v-for="n in [12, 13, 14, 15, 16, 17, 18, 20, 22]" :key="n" :value="n">
+              {{ n }} px
+            </option>
           </select>
         </label>
         <label class="modal-label">

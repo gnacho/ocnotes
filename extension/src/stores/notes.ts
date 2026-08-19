@@ -25,6 +25,8 @@ interface AppState {
   loading: boolean
   error: string | null
   sidebarOpen: boolean
+  editorFont: string
+  editorFontSize: number
 }
 
 export const state = reactive<AppState>({
@@ -39,6 +41,8 @@ export const state = reactive<AppState>({
   loading: false,
   error: null,
   sidebarOpen: true,
+  editorFont: 'default',
+  editorFontSize: 15,
 })
 
 export function setActiveNote(note: Note | null) {

@@ -6,6 +6,8 @@ const BASE = '/index.php/apps/notes/api/v1'
 export interface Settings {
   notesPath: string
   fileSuffix: string
+  editorFont?: string
+  editorFontSize?: string
 }
 
 export function useNotesApi() {

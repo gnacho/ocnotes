@@ -45,6 +45,18 @@ const ta = ref<HTMLTextAreaElement | null>(null)
 
 const isPreview = computed(() => state.displayMode === 'preview')
 
+const FONT_STACKS: Record<string, string> = {
+  default: 'inherit',
+  sans: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+  serif: "Georgia, 'Times New Roman', serif",
+  mono: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
+}
+
+const editorStyle = computed(() => ({
+  fontFamily: FONT_STACKS[state.editorFont] ?? 'inherit',
+  fontSize: `${state.editorFontSize}px`,
+}))
+
 const categories = computed(() => {
   const set = new Set<string>()
   for (const n of state.notes) {
@@ -454,11 +466,12 @@ function renderPreview(md: string): string {
         v-if="!isPreview"
         ref="ta"
         v-model="content"
+        :style="editorStyle"
         :placeholder="$gettext('Content')"
         class="content-textarea"
         @keydown="onKeydown"
       />
-      <div v-else class="preview-pane" v-html="renderPreview(content)" />
+      <div v-else :style="editorStyle" class="preview-pane" v-html="renderPreview(content)" />
       <p v-if="error" class="error-msg">{{ error }}</p>
     </main>
   </div>
