@@ -316,15 +316,27 @@ function closeEmoji() {
 onMounted(() => window.addEventListener('click', closeEmoji))
 onBeforeUnmount(() => window.removeEventListener('click', closeEmoji))
 
-function renderPreview(md: string): string {
-  const escaped = md
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-  return escaped
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]*)`/g, '<code>$1</code>')
-    .replace(/\n/g, '<br>')
+import MarkdownIt from 'markdown-it'
+
+const md = new MarkdownIt({
+  html: false,
+  linkify: true,
+  typographer: true,
+  breaks: true,
+})
+
+const defaultLink =
+  md.renderer.rules.link_open ||
+  ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
+md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
+  const token = tokens[idx]
+  token.attrSet('target', '_blank')
+  token.attrSet('rel', 'noopener noreferrer')
+  return defaultLink(tokens, idx, options, env, self)
+}
+
+function renderPreview(src: string): string {
+  return md.render(src)
 }
 </script>
 
