@@ -6,6 +6,7 @@ import type { Note } from '../stores/notes'
 import { state } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
 import { useIsDark } from '../composables/theme'
+import NewNoteDialog from './NewNoteDialog.vue'
 
 const { $gettext } = useGettext()
 const isDark = useIsDark()
@@ -30,6 +31,7 @@ const api = useNotesApi()
 const loading = ref(false)
 const creating = ref(false)
 const error = ref<string | null>(null)
+const showNewNote = ref(false)
 
 async function loadNotes() {
   loading.value = true
@@ -40,10 +42,6 @@ async function loadNotes() {
       const newest = [...state.notes].sort((a, b) => b.modified - a.modified)[0]
       if (newest) {
         state.activeNote = newest
-      } else {
-        const n = await api.createNote('New note', '', '')
-        state.notes = [n]
-        state.activeNote = n
       }
     }
   } catch (e) {
@@ -55,12 +53,17 @@ async function loadNotes() {
 
 onMounted(loadNotes)
 
-async function createNew() {
+function openNewNote() {
+  showNewNote.value = true
+}
+
+async function onNewNoteCreated(title: string) {
+  showNewNote.value = false
   creating.value = true
   error.value = null
   try {
     const category = state.currentCategory === '__none__' ? '' : state.currentCategory
-    const n = await api.createNote('New note', '', category)
+    const n = await api.createNote(title, '', category)
     if (category) {
       state.pendingCategories = state.pendingCategories.filter((c) => c !== category)
     }
@@ -143,7 +146,7 @@ function formatShort(ts: number): string {
 <template>
   <div class="note-list">
     <header class="note-list-header">
-      <button :class="createClasses" :disabled="creating" @click="createNew">
+      <button :class="createClasses" :disabled="creating" @click="openNewNote">
         <Plus :size="16" />
         {{ $gettext('New note') }}
       </button>
@@ -193,5 +196,11 @@ function formatShort(ts: number): string {
         </ul>
       </section>
     </template>
+
+    <NewNoteDialog
+      v-if="showNewNote"
+      @create="onNewNoteCreated"
+      @close="showNewNote = false"
+    />
   </div>
 </template>

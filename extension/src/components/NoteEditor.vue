@@ -26,6 +26,7 @@ import type { Note } from '../stores/notes'
 import { state, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
 import { useIsDark } from '../composables/theme'
+import ModalDialog from './ModalDialog.vue'
 
 const isDark = useIsDark()
 
@@ -54,6 +55,7 @@ const content = ref(props.note.content)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const showEmoji = ref(false)
+const showConfirmDelete = ref(false)
 
 const ta = ref<HTMLTextAreaElement | null>(null)
 
@@ -280,6 +282,11 @@ async function remove() {
   }
 }
 
+function confirmDelete() {
+  showConfirmDelete.value = false
+  void remove()
+}
+
 async function toggleFavorite() {
   const fav = !props.note.favorite
   error.value = null
@@ -453,7 +460,7 @@ watch(
       <button
         class="oc-button oc-button-raw icon-btn danger"
         :aria-label="$gettext('Delete')"
-        @click="remove"
+        @click="showConfirmDelete = true"
       >
         <Trash2 :size="18" />
       </button>
@@ -553,5 +560,21 @@ watch(
       <div v-else :style="editorStyle" class="preview-pane" v-html="previewHtml" />
       <p v-if="error" class="error-msg">{{ error }}</p>
     </main>
+
+    <ModalDialog
+      v-if="showConfirmDelete"
+      :title="$gettext('Delete note')"
+      @close="showConfirmDelete = false"
+    >
+      <p>{{ $gettext('Are you sure you want to delete this note? This action cannot be undone.') }}</p>
+      <footer class="modal-actions">
+        <button type="button" class="oc-button oc-button-outline" @click="showConfirmDelete = false">
+          {{ $gettext('Cancel') }}
+        </button>
+        <button type="button" class="oc-button oc-button-filled btn-danger" @click="confirmDelete">
+          {{ $gettext('Delete') }}
+        </button>
+      </footer>
+    </ModalDialog>
   </div>
 </template>

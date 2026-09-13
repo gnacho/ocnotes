@@ -4,6 +4,7 @@ import { PanelLeft, StickyNote } from 'lucide-vue-next'
 import SidebarNav from '../components/SidebarNav.vue'
 import NoteList from '../components/NoteList.vue'
 import NoteEditor from '../components/NoteEditor.vue'
+import NewNoteDialog from '../components/NewNoteDialog.vue'
 import { state, toggleZenMode } from '../stores/notes'
 import type { Note } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
@@ -17,13 +18,19 @@ function selectNote(note: Note) {
 function handleDeleted() {
   const remaining = [...state.notes].sort((a, b) => b.modified - a.modified)
   state.activeNote = remaining[0] ?? null
-  if (!state.activeNote) void newNote()
 }
 
-async function newNote() {
+const showNewNote = ref(false)
+
+function newNote() {
+  showNewNote.value = true
+}
+
+async function onNewNoteCreated(title: string) {
+  showNewNote.value = false
   const category = state.currentCategory === '__none__' ? '' : state.currentCategory
   try {
-    const n = await api.createNote('New note', '', category)
+    const n = await api.createNote(title, '', category)
     if (category) {
       state.pendingCategories = state.pendingCategories.filter((c) => c !== category)
     }
@@ -130,5 +137,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
         </div>
       </main>
     </div>
+
+    <NewNoteDialog
+      v-if="showNewNote"
+      @create="onNewNoteCreated"
+      @close="showNewNote = false"
+    />
   </main>
 </template>
