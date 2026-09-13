@@ -7,7 +7,6 @@ import { state } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
 import { useIsDark } from '../composables/theme'
 import { useDragNote } from '../composables/useDragNote'
-import NewNoteDialog from './NewNoteDialog.vue'
 
 const { $gettext } = useGettext()
 const isDark = useIsDark()
@@ -26,14 +25,13 @@ const createClasses = computed(() => [
 
 const emit = defineEmits<{
   selectNote: [note: Note]
+  requestNewNote: []
 }>()
 
 const api = useNotesApi()
 const { onDragStart, onDragEnd } = useDragNote()
 const loading = ref(false)
-const creating = ref(false)
 const error = ref<string | null>(null)
-const showNewNote = ref(false)
 
 async function loadNotes() {
   loading.value = true
@@ -54,29 +52,6 @@ async function loadNotes() {
 }
 
 onMounted(loadNotes)
-
-function openNewNote() {
-  showNewNote.value = true
-}
-
-async function onNewNoteCreated(title: string) {
-  showNewNote.value = false
-  creating.value = true
-  error.value = null
-  try {
-    const category = state.currentCategory === '__none__' ? '' : state.currentCategory
-    const n = await api.createNote(title, '', category)
-    if (category) {
-      state.pendingCategories = state.pendingCategories.filter((c) => c !== category)
-    }
-    state.notes = [n, ...state.notes]
-    emit('selectNote', n)
-  } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    creating.value = false
-  }
-}
 
 function inCurrentCategory(n: Note): boolean {
   if (state.currentCategory === '') return true
@@ -148,7 +123,7 @@ function formatShort(ts: number): string {
 <template>
   <div class="note-list">
     <header class="note-list-header">
-      <button :class="createClasses" :disabled="creating" @click="openNewNote">
+      <button :class="createClasses" @click="emit('requestNewNote')">
         <Plus :size="16" />
         {{ $gettext('New note') }}
       </button>
@@ -201,11 +176,5 @@ function formatShort(ts: number): string {
         </ul>
       </section>
     </template>
-
-    <NewNoteDialog
-      v-if="showNewNote"
-      @create="onNewNoteCreated"
-      @close="showNewNote = false"
-    />
   </div>
 </template>
