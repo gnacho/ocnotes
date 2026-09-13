@@ -19,6 +19,21 @@ type ShadowUser struct {
 	CreatedAt    int64
 }
 
+// displayUsername returns the best available username for readability and
+// logging: the UPN, else the on-prem SAM account name, else the mail. UPN can
+// be null (this deployment's users), so it must not be used as a scoping key.
+func displayUsername(upn, sam, mail string) string {
+	switch {
+	case upn != "":
+		return upn
+	case sam != "":
+		return sam
+	case mail != "":
+		return mail
+	}
+	return ""
+}
+
 type Validator struct {
 	graphURL  string
 	mu        sync.Mutex
@@ -60,10 +75,11 @@ func (v *Validator) ValidateBasic(username, token string) (*ShadowUser, error) {
 	data, _ := io.ReadAll(resp.Body)
 
 	var graphUser struct {
-		ID                string `json:"id"`
-		UserPrincipalName string `json:"userPrincipalName"`
-		DisplayName       string `json:"displayName"`
-		Mail              string `json:"mail"`
+		ID                       string `json:"id"`
+		UserPrincipalName        string `json:"userPrincipalName"`
+		OnPremisesSamAccountName string `json:"onPremisesSamAccountName"`
+		DisplayName              string `json:"displayName"`
+		Mail                     string `json:"mail"`
 	}
 	if err := json.Unmarshal(data, &graphUser); err != nil {
 		return nil, fmt.Errorf("decode graph: %w", err)
@@ -74,7 +90,7 @@ func (v *Validator) ValidateBasic(username, token string) (*ShadowUser, error) {
 
 	su := ShadowUser{
 		ID:          graphUser.ID,
-		Username:    graphUser.UserPrincipalName,
+		Username:    displayUsername(graphUser.UserPrincipalName, graphUser.OnPremisesSamAccountName, graphUser.Mail),
 		DisplayName: graphUser.DisplayName,
 		Email:       graphUser.Mail,
 		TokenHash:   base64.StdEncoding.EncodeToString([]byte(token)),
@@ -111,10 +127,11 @@ func (v *Validator) ValidateBearer(token string) (*ShadowUser, error) {
 	data, _ := io.ReadAll(resp.Body)
 
 	var graphUser struct {
-		ID                string `json:"id"`
-		UserPrincipalName string `json:"userPrincipalName"`
-		DisplayName       string `json:"displayName"`
-		Mail              string `json:"mail"`
+		ID                       string `json:"id"`
+		UserPrincipalName        string `json:"userPrincipalName"`
+		OnPremisesSamAccountName string `json:"onPremisesSamAccountName"`
+		DisplayName              string `json:"displayName"`
+		Mail                     string `json:"mail"`
 	}
 	if err := json.Unmarshal(data, &graphUser); err != nil {
 		return nil, fmt.Errorf("decode graph: %w", err)
@@ -125,7 +142,7 @@ func (v *Validator) ValidateBearer(token string) (*ShadowUser, error) {
 
 	su := ShadowUser{
 		ID:          graphUser.ID,
-		Username:    graphUser.UserPrincipalName,
+		Username:    displayUsername(graphUser.UserPrincipalName, graphUser.OnPremisesSamAccountName, graphUser.Mail),
 		DisplayName: graphUser.DisplayName,
 		Email:       graphUser.Mail,
 		TokenHash:   "",

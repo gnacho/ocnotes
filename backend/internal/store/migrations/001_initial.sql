@@ -1,3 +1,6 @@
+-- 001_initial: baseline schema (the pre-multiuser state). Idempotent so it is
+-- a no-op on an existing database. Per-user settings defaults are seeded lazily
+-- in code, not here.
 CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL DEFAULT 'New note',
@@ -16,6 +19,3 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL DEFAULT ''
 );
-
-INSERT OR IGNORE INTO settings (key, value) VALUES ('notesPath', 'Notes');
-INSERT OR IGNORE INTO settings (key, value) VALUES ('fileSuffix', '.md');
