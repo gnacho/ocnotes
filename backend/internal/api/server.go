@@ -6,12 +6,16 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
+	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/attachments"
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/auth"
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/imgproxy"
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/store"
@@ -19,10 +23,15 @@ import (
 
 const (
 	Base               = "/index.php/apps/notes/api/v1/"
+	Base14             = "/index.php/apps/notes/api/v1.4/"
 	APIVersionsHeader  = "X-Notes-API-Versions"
 	AllowedAPIVersions = "0.2, 1.4"
 	Version            = "6.0.0"
 )
+
+// maxRequestBytes caps the multipart body: the 32 MiB file cap plus 1 MiB of
+// multipart overhead. Anything larger is rejected with 413 before parsing.
+const maxRequestBytes = attachments.MaxAttachmentBytes + 1<<20
 
 type noteKeyType struct{}
 
@@ -31,14 +40,15 @@ type prunedNote struct {
 }
 
 type Server struct {
-	base      string
-	store     *store.Store
-	validator *auth.Validator
-	images    *imgproxy.Proxy
+	base        string
+	store       *store.Store
+	validator   *auth.Validator
+	images      *imgproxy.Proxy
+	attachments *attachments.Store
 }
 
-func NewServer(base string, s *store.Store, v *auth.Validator, images *imgproxy.Proxy) *Server {
-	return &Server{base: base, store: s, validator: v, images: images}
+func NewServer(base string, s *store.Store, v *auth.Validator, images *imgproxy.Proxy, attachments *attachments.Store) *Server {
+	return &Server{base: base, store: s, validator: v, images: images, attachments: attachments}
 }
 
 func (s *Server) Router() http.Handler {
@@ -56,15 +66,13 @@ func (s *Server) Router() http.Handler {
 	})
 	mux.HandleFunc(s.base+"settings", s.handleSettings)
 	mux.HandleFunc(s.base+"img/sign", s.handleImgSign)
-	mux.HandleFunc(s.base+"attachment/", func(w http.ResponseWriter, r *http.Request) {
-		parts := strings.Split(strings.TrimPrefix(r.URL.Path, s.base), "/")
+	mux.HandleFunc(Base14+"attachment/", func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.TrimPrefix(r.URL.Path, Base14), "/")
 		if len(parts) >= 2 && parts[0] == "attachment" && parts[1] != "" {
-			w.Header().Set(APIVersionsHeader, AllowedAPIVersions)
-			w.WriteHeader(http.StatusNotFound)
-			fmt.Fprintf(w, `{"error":"attachments not implemented yet"}`)
-		} else {
-			http.NotFound(w, r)
+			s.handleAttachment(w, r, parts[1])
+			return
 		}
+		http.NotFound(w, r)
 	})
 
 	// OCS endpoints for clients (capabilities, user info)
@@ -117,6 +125,96 @@ func (s *Server) handleImgSign(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"signed": signed})
+}
+
+// handleAttachment serves the Nextcloud Notes API v1.4 attachment endpoints.
+// POST uploads the multipart `file` field; GET streams a stored attachment.
+func (s *Server) handleAttachment(w http.ResponseWriter, r *http.Request, idStr string) {
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, `{"error":"invalid id"}`, http.StatusBadRequest)
+		return
+	}
+
+	if _, err := s.store.GetNote(id); err != nil {
+		if err == sql.ErrNoRows {
+			w.Header().Set(APIVersionsHeader, AllowedAPIVersions)
+			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+			return
+		}
+		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	if s.attachments == nil {
+		http.Error(w, `{"error":"unavailable"}`, http.StatusServiceUnavailable)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPost:
+		s.handleAttachmentUpload(w, r, id)
+	case http.MethodGet:
+		s.handleAttachmentDownload(w, r, id)
+	default:
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) handleAttachmentUpload(w http.ResponseWriter, r *http.Request, id int64) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
+
+	err := r.ParseMultipartForm(1 << 20)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			http.Error(w, `{"error":"attachment too large"}`, http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, `{"error":"invalid multipart form"}`, http.StatusBadRequest)
+		return
+	}
+	defer func() { _ = r.MultipartForm.RemoveAll() }()
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, `{"error":"missing file field"}`, http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	apiPath, err := s.attachments.Save(id, header.Filename, file)
+	if err != nil {
+		if err == attachments.ErrTooLarge {
+			http.Error(w, `{"error":"attachment too large"}`, http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, `{"error":"save failed"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"filename": apiPath})
+}
+
+func (s *Server) handleAttachmentDownload(w http.ResponseWriter, r *http.Request, id int64) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		http.Error(w, `{"error":"missing path"}`, http.StatusNotFound)
+		return
+	}
+
+	rc, size, ct, err := s.attachments.Open(id, path)
+	if err != nil {
+		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		return
+	}
+	defer rc.Close()
+
+	w.Header().Set("Content-Type", ct)
+	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
+	w.WriteHeader(http.StatusOK)
+	_, _ = io.Copy(w, rc)
 }
 
 func (s *Server) middleware(next http.Handler) http.Handler {
@@ -398,6 +496,12 @@ func (s *Server) handleDeleteNote(w http.ResponseWriter, r *http.Request, id int
 	if err != nil {
 		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
 		return
+	}
+
+	if s.attachments != nil {
+		if err := s.attachments.DeleteNote(id); err != nil {
+			slog.Default().Error("delete note attachments", "id", id, "err", err)
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
