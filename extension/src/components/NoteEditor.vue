@@ -142,20 +142,24 @@ function redo() {
   })
 }
 
-watch(
-  () => props.note,
-  (n) => {
-    revokeAttachments()
-    title.value = n.title
-    content.value = n.content
-    history.value = [n.content]
-    hIndex = 0
-    canUndo.value = false
-    canRedo.value = false
-    error.value = null
-    showEmoji.value = false
-  },
-)
+function resetTo(n: Note) {
+  revokeAttachments()
+  title.value = n.title
+  content.value = n.content
+  history.value = [n.content]
+  hIndex = 0
+  canUndo.value = false
+  canRedo.value = false
+  error.value = null
+  showEmoji.value = false
+}
+
+watch(() => props.note, resetTo)
+
+// Clear the pending edits, used when the user chooses to discard them.
+function discard() {
+  resetTo(props.note)
+}
 
 /* ----- markdown editing helpers ----- */
 function applyEdit(next: string, selStart: number, selEnd: number) {
@@ -524,7 +528,7 @@ watch(
   { immediate: true },
 )
 
-defineExpose({ isDirty: () => isDirty.value, save })
+defineExpose({ isDirty: () => isDirty.value, save, discard })
 </script>
 
 <template>
