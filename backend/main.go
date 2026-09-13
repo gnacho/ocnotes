@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/api"
+	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/attachments"
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/auth"
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/config"
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/imgproxy"
@@ -35,7 +36,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("image proxy: %v", err)
 	}
-	server := api.NewServer(api.Base, dbStore, validator, images)
+	atts, err := attachments.New(cfg.DataDir, slog.Default())
+	if err != nil {
+		log.Fatalf("attachments: %v", err)
+	}
+	server := api.NewServer(api.Base, dbStore, validator, images, atts)
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
