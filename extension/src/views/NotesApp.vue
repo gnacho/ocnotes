@@ -57,6 +57,7 @@ function proceed() {
 }
 
 function discardChanges() {
+  editorRef.value?.discard()
   proceed()
 }
 
