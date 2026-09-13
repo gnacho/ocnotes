@@ -13,7 +13,7 @@ import (
 type Note struct {
 	ID       int64  `json:"id"`
 	Etag     string `json:"etag"`
-	Readonly bool   `json:"readonly,omitempty"`
+	Readonly bool   `json:"readonly"`
 	Modified int64  `json:"modified"`
 	Title    string `json:"title"`
 	Category string `json:"category"`
@@ -93,10 +93,6 @@ func (s *Store) ListNotes(user string, category string, exclude []string, limit 
 	if category != "" {
 		query += " AND category=?"
 		args = append(args, category)
-	}
-	if pruneBefore > 0 {
-		query += " AND modified<?"
-		args = append(args, pruneBefore)
 	}
 
 	query += ` ORDER BY favorite DESC, modified DESC`
