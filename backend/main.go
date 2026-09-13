@@ -25,7 +25,7 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 	log.Printf("ocnotes starting addr=%s dataDir=%s", cfg.Addr, cfg.DataDir)
 
-	dbStore, err := store.Open(cfg.DataDir)
+	dbStore, err := store.Open(cfg.DataDir, cfg.Owner)
 	if err != nil {
 		log.Fatalf("open database: %v", err)
 	}

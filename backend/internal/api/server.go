@@ -35,6 +35,16 @@ const maxRequestBytes = attachments.MaxAttachmentBytes + 1<<20
 
 type noteKeyType struct{}
 
+// currentUser returns the authenticated user's stable id (graph id) from the
+// request context, set by middleware. It is the scoping key for notes, settings
+// and attachments; it must not be the username, which may be empty.
+func currentUser(r *http.Request) string {
+	if u, ok := r.Context().Value(noteKeyType{}).(*auth.ShadowUser); ok && u != nil {
+		return u.ID
+	}
+	return ""
+}
+
 type prunedNote struct {
 	ID int64 `json:"id"`
 }
@@ -136,7 +146,8 @@ func (s *Server) handleAttachment(w http.ResponseWriter, r *http.Request, idStr 
 		return
 	}
 
-	if _, err := s.store.GetNote(id); err != nil {
+	user := currentUser(r)
+	if _, err := s.store.GetNote(user, id); err != nil {
 		if err == sql.ErrNoRows {
 			w.Header().Set(APIVersionsHeader, AllowedAPIVersions)
 			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
@@ -324,7 +335,8 @@ func (s *Server) handleGetNotes(w http.ResponseWriter, r *http.Request) {
 		limit = chunkSize + 1
 	}
 
-	notes, err := s.store.ListNotes(category, exclude, limit, pruneBefore)
+	user := currentUser(r)
+	notes, err := s.store.ListNotes(user, category, exclude, limit, pruneBefore)
 	if err != nil {
 		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
 		return
@@ -420,7 +432,8 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 		input.Title = "New note"
 	}
 	now := time.Now().Unix()
-	note, err := s.store.CreateNote(input.Title, input.Content, input.Category, now)
+	user := currentUser(r)
+	note, err := s.store.CreateNote(user, input.Title, input.Content, input.Category, now)
 	if err != nil {
 		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
 		return
@@ -431,7 +444,8 @@ func (s *Server) handleCreateNote(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetNote(w http.ResponseWriter, r *http.Request, id int64) {
-	note, err := s.store.GetNote(id)
+	user := currentUser(r)
+	note, err := s.store.GetNote(user, id)
 	if err == sql.ErrNoRows {
 		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
 		return
@@ -447,7 +461,8 @@ func (s *Server) handleGetNote(w http.ResponseWriter, r *http.Request, id int64)
 }
 
 func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request, id int64) {
-	note, err := s.store.GetNote(id)
+	user := currentUser(r)
+	note, err := s.store.GetNote(user, id)
 	if err == sql.ErrNoRows {
 		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
 		return
@@ -477,7 +492,7 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request, id int
 	}
 
 	now := time.Now().Unix()
-	updated, err := s.store.UpdateNote(id, input.Title, input.Content, input.Category, input.Favorite, now)
+	updated, err := s.store.UpdateNote(user, id, input.Title, input.Content, input.Category, input.Favorite, now)
 	if err != nil {
 		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
 		return
@@ -488,7 +503,8 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request, id int
 }
 
 func (s *Server) handleDeleteNote(w http.ResponseWriter, r *http.Request, id int64) {
-	err := s.store.DeleteNote(id)
+	user := currentUser(r)
+	err := s.store.DeleteNote(user, id)
 	if err == sql.ErrNoRows {
 		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
 		return
@@ -509,7 +525,8 @@ func (s *Server) handleDeleteNote(w http.ResponseWriter, r *http.Request, id int
 }
 
 func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
-	settings, err := s.store.GetSettings()
+	user := currentUser(r)
+	settings, err := s.store.GetSettings(user)
 	if err != nil {
 		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
 		return
@@ -526,7 +543,8 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := s.store.UpdateSettings(input)
+	user := currentUser(r)
+	result, err := s.store.UpdateSettings(user, input)
 	if err != nil {
 		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
 		return

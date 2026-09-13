@@ -10,6 +10,7 @@ type Config struct {
 	DataDir  string
 	GraphURL string
 	AppName  string
+	Owner    string
 }
 
 func Load() Config {
@@ -37,6 +38,8 @@ func Load() Config {
 	} else if mode != "local" {
 		panic(fmt.Sprintf("unknown OCNOTES_AUTH_MODE=%q", mode))
 	}
+
+	cfg.Owner = os.Getenv("OCNOTES_OWNER")
 
 	return cfg
 }
