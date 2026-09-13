@@ -141,6 +141,10 @@
   font-weight: 600;
 }
 
+.nav-list li.drop-target {
+  background: var(--oc-role-secondary-container);
+}
+
 .nav-label {
   display: flex;
   align-items: center;
@@ -246,7 +250,7 @@
 .note-item {
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid var(--oc-role-outline-variant);
-  cursor: pointer;
+  cursor: grab;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;

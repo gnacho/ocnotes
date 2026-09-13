@@ -12,10 +12,12 @@ import {
 import { state, setCurrentCategory, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
 import { useIsDark } from '../composables/theme'
+import { useDragNote } from '../composables/useDragNote'
 import ModalDialog from './ModalDialog.vue'
 
 const api = useNotesApi()
 const isDark = useIsDark()
+const { onDragOverCategory, onDragLeaveCategory, onDropOnCategory } = useDragNote()
 
 const createCategoryClasses = computed(() => [
   'btn-new-category',
@@ -143,14 +145,22 @@ async function saveSettings() {
         <li
           v-for="cat in allCategories"
           :key="cat"
-          :class="{ active: state.currentCategory === cat }"
+          :class="{ active: state.currentCategory === cat, 'drop-target': state.dragOverCategory === cat }"
+          @dragover="onDragOverCategory($event, cat)"
+          @dragleave="onDragLeaveCategory($event)"
+          @drop="onDropOnCategory($event, cat)"
         >
           <button @click="setCurrentCategory(cat)">
             <span class="nav-label"><Folder :size="15" /> {{ cat }}</span>
             <span class="count">{{ categoryCount(cat) }}</span>
           </button>
         </li>
-        <li :class="{ active: state.currentCategory === '__none__' }">
+        <li
+          :class="{ active: state.currentCategory === '__none__', 'drop-target': state.dragOverCategory === '' }"
+          @dragover="onDragOverCategory($event, '')"
+          @dragleave="onDragLeaveCategory($event)"
+          @drop="onDropOnCategory($event, '')"
+        >
           <button @click="setCurrentCategory('__none__')">
             <span class="nav-label">{{ $gettext('Uncategorized') }}</span>
             <span class="count">{{ uncategorizedCount }}</span>

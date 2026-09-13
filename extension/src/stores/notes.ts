@@ -27,6 +27,9 @@ interface AppState {
   sidebarOpen: boolean
   editorFont: string
   editorFontSize: number
+  draggedNoteId: number | null
+  dragOverCategory: string | null
+  dropError: string | null
 }
 
 export const state = reactive<AppState>({
@@ -43,6 +46,9 @@ export const state = reactive<AppState>({
   sidebarOpen: true,
   editorFont: 'default',
   editorFontSize: 15,
+  draggedNoteId: null,
+  dragOverCategory: null,
+  dropError: null,
 })
 
 export function setActiveNote(note: Note | null) {
