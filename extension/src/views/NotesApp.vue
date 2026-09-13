@@ -5,13 +5,26 @@ import SidebarNav from '../components/SidebarNav.vue'
 import NoteList from '../components/NoteList.vue'
 import NoteEditor from '../components/NoteEditor.vue'
 import NewNoteDialog from '../components/NewNoteDialog.vue'
+import ModalDialog from '../components/ModalDialog.vue'
 import { state, toggleZenMode } from '../stores/notes'
 import type { Note } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
 
 const api = useNotesApi()
 
+const editorRef = ref<InstanceType<typeof NoteEditor> | null>(null)
+
+type PendingAction = { kind: 'select'; note: Note } | { kind: 'new' }
+const pendingAction = ref<PendingAction | null>(null)
+const showUnsavedDialog = ref(false)
+
 function selectNote(note: Note) {
+  if (note === state.activeNote) return
+  if (editorRef.value?.isDirty()) {
+    pendingAction.value = { kind: 'select', note }
+    showUnsavedDialog.value = true
+    return
+  }
   state.activeNote = note
 }
 
@@ -23,7 +36,41 @@ function handleDeleted() {
 const showNewNote = ref(false)
 
 function newNote() {
+  if (editorRef.value?.isDirty()) {
+    pendingAction.value = { kind: 'new' }
+    showUnsavedDialog.value = true
+    return
+  }
   showNewNote.value = true
+}
+
+function proceed() {
+  const action = pendingAction.value
+  pendingAction.value = null
+  showUnsavedDialog.value = false
+  if (!action) return
+  if (action.kind === 'select') {
+    state.activeNote = action.note
+  } else {
+    showNewNote.value = true
+  }
+}
+
+function discardChanges() {
+  proceed()
+}
+
+async function saveChanges() {
+  const editor = editorRef.value
+  if (!editor) return
+  await editor.save()
+  if (editor.isDirty()) return
+  proceed()
+}
+
+function cancelUnsaved() {
+  pendingAction.value = null
+  showUnsavedDialog.value = false
 }
 
 async function onNewNoteCreated(title: string) {
@@ -119,13 +166,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
         class="notes-list-col"
         :style="{ width: `${listWidth}px` }"
       >
-        <NoteList @select-note="selectNote" />
+        <NoteList @select-note="selectNote" @request-new-note="newNote" />
       </section>
 
       <div v-if="!state.zenMode" class="col-resizer" @pointerdown="startResize" />
 
       <main class="notes-main">
         <NoteEditor
+          ref="editorRef"
           v-if="state.activeNote"
           :note="state.activeNote"
           @deleted="handleDeleted"
@@ -143,5 +191,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
       @create="onNewNoteCreated"
       @close="showNewNote = false"
     />
+
+    <ModalDialog
+      v-if="showUnsavedDialog"
+      :title="$gettext('Unsaved changes')"
+      @close="cancelUnsaved"
+    >
+      <p>{{ $gettext('You have unsaved changes. Save them before leaving this note?') }}</p>
+      <footer class="modal-actions">
+        <button type="button" class="oc-button oc-button-outline" @click="cancelUnsaved">
+          {{ $gettext('Cancel') }}
+        </button>
+        <button type="button" class="oc-button oc-button-outline" @click="discardChanges">
+          {{ $gettext('Discard') }}
+        </button>
+        <button type="button" class="oc-button oc-button-primary oc-button-filled" @click="saveChanges">
+          {{ $gettext('Save') }}
+        </button>
+      </footer>
+    </ModalDialog>
   </main>
 </template>

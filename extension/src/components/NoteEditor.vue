@@ -54,6 +54,9 @@ const props = defineProps<{
 const api = useNotesApi()
 const title = ref(props.note.title)
 const content = ref(props.note.content)
+const isDirty = computed(
+  () => title.value !== props.note.title || content.value !== props.note.content,
+)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const showEmoji = ref(false)
@@ -398,6 +401,18 @@ onMounted(() => window.addEventListener('click', closeEmoji))
 onBeforeUnmount(() => window.removeEventListener('click', closeEmoji))
 onBeforeUnmount(revokeAttachments)
 
+function onBeforeUnload(e: BeforeUnloadEvent) {
+  e.preventDefault()
+  e.returnValue = ''
+}
+
+watch(isDirty, (dirty) => {
+  if (dirty) window.addEventListener('beforeunload', onBeforeUnload)
+  else window.removeEventListener('beforeunload', onBeforeUnload)
+})
+
+onBeforeUnmount(() => window.removeEventListener('beforeunload', onBeforeUnload))
+
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 
@@ -508,6 +523,8 @@ watch(
   },
   { immediate: true },
 )
+
+defineExpose({ isDirty: () => isDirty.value, save })
 </script>
 
 <template>
