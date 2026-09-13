@@ -13,14 +13,14 @@ const isDark = useIsDark()
 
 const createClasses = computed(() => [
   'btn-new',
-  'shadow-md',
-  'duration-150',
-  'ease-out',
-  'hover:brightness-110',
-  'w-full',
+  'ext:shadow-md',
+  'ext:duration-150',
+  'ext:ease-out',
+  'ext:hover:brightness-110',
+  'ext:w-full',
   isDark.value
-    ? 'oc-button-filled oc-button-primary-container !bg-gradient-to-r !from-role-secondary-container !to-role-primary-container'
-    : 'oc-button-filled oc-button-primary !bg-gradient-to-r !from-role-secondary !to-role-primary',
+    ? 'oc-button-filled oc-button-primary-container ext:!bg-gradient-to-r ext:!from-role-secondary-container ext:!to-role-primary-container'
+    : 'oc-button-filled oc-button-primary ext:!bg-gradient-to-r ext:!from-role-secondary ext:!to-role-primary',
 ])
 
 const emit = defineEmits<{
