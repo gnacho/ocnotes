@@ -49,6 +49,29 @@ type prunedNote struct {
 	ID int64 `json:"id"`
 }
 
+// jsonBool decodes a JSON value that may be a boolean (true/false) or an
+// integer (1/0), as Iotas sends favorite as 1|0 while the Notes API uses
+// booleans. A null value leaves Set false, meaning "do not change".
+type jsonBool struct {
+	Set   bool
+	Value bool
+}
+
+func (b *jsonBool) UnmarshalJSON(data []byte) error {
+	switch strings.TrimSpace(string(data)) {
+	case "null":
+		b.Set = false
+		return nil
+	case "true", "1":
+		b.Set, b.Value = true, true
+		return nil
+	case "false", "0":
+		b.Set, b.Value = true, false
+		return nil
+	}
+	return fmt.Errorf("invalid favorite value %s", string(data))
+}
+
 type Server struct {
 	base        string
 	store       *store.Store
@@ -343,10 +366,15 @@ func (s *Server) handleGetNotes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	now := time.Now().Unix()
-	tm := time.Unix(now, 0)
-	w.Header().Set("Last-Modified", tm.Format(http.TimeFormat))
 	if len(notes) > 0 {
 		w.Header().Set("ETag", fmt.Sprintf("%x", sha256.Sum256([]byte(notes[0].Etag))))
+		var newest int64
+		for _, n := range notes {
+			if n.Modified > newest {
+				newest = n.Modified
+			}
+		}
+		w.Header().Set("Last-Modified", time.Unix(newest, 0).Format(http.TimeFormat))
 	}
 
 	if len(notes) == 0 {
@@ -367,6 +395,7 @@ func (s *Server) handleGetNotes(w http.ResponseWriter, r *http.Request) {
 					"category": n.Category,
 					"content":  n.Content,
 					"favorite": n.Favorite,
+					"readonly": n.Readonly,
 				})
 			} else {
 				pruned = append(pruned, &prunedNote{ID: n.ID})
@@ -387,6 +416,7 @@ func (s *Server) handleGetNotes(w http.ResponseWriter, r *http.Request) {
 				"title":    n.Title,
 				"category": n.Category,
 				"favorite": n.Favorite,
+				"readonly": n.Readonly,
 			}
 			for _, e := range exclude {
 				e = strings.TrimSpace(e)
@@ -404,6 +434,7 @@ func (s *Server) handleGetNotes(w http.ResponseWriter, r *http.Request) {
 				"category": n.Category,
 				"content":  n.Content,
 				"favorite": n.Favorite,
+				"readonly": n.Readonly,
 			})
 		}
 	}
@@ -484,15 +515,20 @@ func (s *Server) handleUpdateNote(w http.ResponseWriter, r *http.Request, id int
 		Title    *string `json:"title"`
 		Content  *string `json:"content"`
 		Category *string `json:"category"`
-		Favorite *bool   `json:"favorite"`
+		Favorite jsonBool `json:"favorite"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
 		return
 	}
 
+	var favorite *bool
+	if input.Favorite.Set {
+		favorite = &input.Favorite.Value
+	}
+
 	now := time.Now().Unix()
-	updated, err := s.store.UpdateNote(user, id, input.Title, input.Content, input.Category, input.Favorite, now)
+	updated, err := s.store.UpdateNote(user, id, input.Title, input.Content, input.Category, favorite, now)
 	if err != nil {
 		http.Error(w, `{"error":"database error"}`, http.StatusInternalServerError)
 		return
@@ -554,9 +590,56 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// capabilitiesResponse mirrors the OCS capabilities envelope returned when a
+// client asks for JSON, matching the shape Iotas expects.
+type capabilitiesResponse struct {
+	Ocs capabilitiesOcs `json:"ocs"`
+}
+
+type capabilitiesOcs struct {
+	Meta capabilitiesMeta `json:"meta"`
+	Data capabilitiesData `json:"data"`
+}
+
+type capabilitiesMeta struct {
+	Status     string `json:"status"`
+	StatusCode int    `json:"statuscode"`
+	Message    string `json:"message"`
+}
+
+type capabilitiesData struct {
+	Capabilities capabilitiesCaps `json:"capabilities"`
+}
+
+type capabilitiesCaps struct {
+	Notes capabilitiesNotes `json:"notes"`
+}
+
+type capabilitiesNotes struct {
+	APIVersion []string `json:"api_version"`
+	Version    string   `json:"version"`
+}
+
 func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	wantsJSON := strings.Contains(r.Header.Get("Accept"), "application/json") ||
+		r.URL.Query().Get("format") == "json"
+
+	if wantsJSON {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(capabilitiesResponse{
+			Ocs: capabilitiesOcs{
+				Meta: capabilitiesMeta{Status: "ok", StatusCode: 200, Message: "OK"},
+				Data: capabilitiesData{Capabilities: capabilitiesCaps{Notes: capabilitiesNotes{
+					APIVersion: []string{"0.2", "1.4"},
+					Version:    Version,
+				}}},
+			},
+		})
 		return
 	}
 
