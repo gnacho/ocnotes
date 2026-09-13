@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/auth"
+	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/imgproxy"
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/store"
 )
 
@@ -33,10 +34,11 @@ type Server struct {
 	base      string
 	store     *store.Store
 	validator *auth.Validator
+	images    *imgproxy.Proxy
 }
 
-func NewServer(base string, s *store.Store, v *auth.Validator) *Server {
-	return &Server{base: base, store: s, validator: v}
+func NewServer(base string, s *store.Store, v *auth.Validator, images *imgproxy.Proxy) *Server {
+	return &Server{base: base, store: s, validator: v, images: images}
 }
 
 func (s *Server) Router() http.Handler {
@@ -53,6 +55,7 @@ func (s *Server) Router() http.Handler {
 		http.NotFound(w, r)
 	})
 	mux.HandleFunc(s.base+"settings", s.handleSettings)
+	mux.HandleFunc(s.base+"img/sign", s.handleImgSign)
 	mux.HandleFunc(s.base+"attachment/", func(w http.ResponseWriter, r *http.Request) {
 		parts := strings.Split(strings.TrimPrefix(r.URL.Path, s.base), "/")
 		if len(parts) >= 2 && parts[0] == "attachment" && parts[1] != "" {
@@ -70,12 +73,50 @@ func (s *Server) Router() http.Handler {
 	ocsMux.HandleFunc("/ocs/v2.php/cloud/user", s.handleUserInfo)
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// img: ruta PÚBLICA firmada (el <img> del navegador no lleva auth)
+		if s.images != nil && r.URL.Path == s.base+"img" {
+			s.images.Serve(w, r)
+			return
+		}
 		if strings.HasPrefix(r.URL.Path, "/ocs/v2.php/") {
 			ocsMux.ServeHTTP(w, r)
 			return
 		}
 		s.middleware(mux).ServeHTTP(w, r)
 	})
+}
+
+// handleImgSign firma un lote de URLs de imagen para el preview del cliente
+// web. El contenido de la nota NO se muta: la firma vive solo en render time.
+func (s *Server) handleImgSign(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+	if s.images == nil {
+		http.Error(w, `{"error":"unavailable"}`, http.StatusServiceUnavailable)
+		return
+	}
+	var input struct {
+		URLs []string `json:"urls"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		return
+	}
+	if len(input.URLs) == 0 || len(input.URLs) > 32 {
+		http.Error(w, `{"error":"invalid url count"}`, http.StatusBadRequest)
+		return
+	}
+	signed := make(map[string]string, len(input.URLs))
+	for _, u := range input.URLs {
+		if len(u) > 2048 || (!strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://")) {
+			continue
+		}
+		signed[u] = imgproxy.ProxiedURL(s.base, u, s.images.Sign(u))
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"signed": signed})
 }
 
 func (s *Server) middleware(next http.Handler) http.Handler {

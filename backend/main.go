@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +14,7 @@ import (
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/api"
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/auth"
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/config"
+	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/imgproxy"
 	"git.opencloud.example.com/gnacho/ocnotes/backend/internal/store"
 )
 
@@ -29,12 +31,19 @@ func main() {
 	defer dbStore.Close()
 
 	validator := auth.NewOpenCloudValidator(cfg.GraphURL)
-	server := api.NewServer(api.Base, dbStore, validator)
+	images, err := imgproxy.New(cfg.DataDir, slog.Default())
+	if err != nil {
+		log.Fatalf("image proxy: %v", err)
+	}
+	server := api.NewServer(api.Base, dbStore, validator, images)
 
 	srv := &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           server.Router(),
-		ReadHeaderTimeout: 10 * 1024,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	idle := make(chan os.Signal, 1)

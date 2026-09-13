@@ -17,28 +17,32 @@ interface AppState {
   notes: Note[]
   activeNote: Note | null
   categories: string[]
+  pendingCategories: string[]
   currentCategory: string
-  filterFavorites: boolean
   searchQuery: string
   displayMode: DisplayMode
   zenMode: boolean
   loading: boolean
   error: string | null
   sidebarOpen: boolean
+  editorFont: string
+  editorFontSize: number
 }
 
 export const state = reactive<AppState>({
   notes: [],
   activeNote: null,
   categories: [],
+  pendingCategories: [],
   currentCategory: '',
-  filterFavorites: false,
   searchQuery: '',
   displayMode: 'rich',
   zenMode: false,
   loading: false,
   error: null,
   sidebarOpen: true,
+  editorFont: 'default',
+  editorFontSize: 15,
 })
 
 export function setActiveNote(note: Note | null) {
@@ -63,14 +67,6 @@ export function isZenMode() {
 
 export function setCurrentCategory(cat: string) {
   state.currentCategory = cat
-  state.filterFavorites = false
-}
-
-export function toggleFavoritesFilter() {
-  state.filterFavorites = !state.filterFavorites
-  if (state.filterFavorites) {
-    state.currentCategory = ''
-  }
 }
 
 export function setSearchQuery(q: string) {

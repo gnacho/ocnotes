@@ -6,6 +6,8 @@ const BASE = '/index.php/apps/notes/api/v1'
 export interface Settings {
   notesPath: string
   fileSuffix: string
+  editorFont?: string
+  editorFontSize?: string
 }
 
 export function useNotesApi() {
@@ -46,5 +48,10 @@ export function useNotesApi() {
     deleteNote: (id: number) => client.httpAuthenticated.delete(`${BASE}/notes/${id}`),
     getSettings: () => get<Settings>('/settings'),
     updateSettings: (updates: Partial<Settings>) => put<Settings>('/settings', updates),
+    signImages: async (urls: string[]): Promise<Record<string, string>> => {
+      if (!urls.length) return {}
+      const { data } = await client.httpAuthenticated.post(`${BASE}/img/sign`, { urls })
+      return (data as { signed?: Record<string, string> }).signed ?? {}
+    },
   }
 }

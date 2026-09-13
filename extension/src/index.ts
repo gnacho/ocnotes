@@ -5,8 +5,23 @@ import {
   AppMenuItemExtension
 } from '@opencloud-eu/web-pkg'
 import { urlJoin } from '@opencloud-eu/web-client'
-import '@opencloud-eu/extension-sdk/tailwind.css'
-import './styles.css'
+import sdkStyles from '@opencloud-eu/extension-sdk/tailwind.css?inline'
+import styles from './styles.css?inline'
+
+function injectStyles() {
+  for (const [id, css] of [
+    ['ocnotes-sdk-styles', sdkStyles],
+    ['ocnotes-styles', styles],
+  ] as const) {
+    if (document.getElementById(id)) continue
+    const el = document.createElement('style')
+    el.id = id
+    el.textContent = css
+    document.head.appendChild(el)
+  }
+}
+
+injectStyles()
 import { RouteRecordRaw } from 'vue-router'
 import { computed } from 'vue'
 import { useGettext } from 'vue3-gettext'
