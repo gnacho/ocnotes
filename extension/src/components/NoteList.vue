@@ -6,6 +6,7 @@ import type { Note } from '../stores/notes'
 import { state } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
 import { useIsDark } from '../composables/theme'
+import { useDragNote } from '../composables/useDragNote'
 import NewNoteDialog from './NewNoteDialog.vue'
 
 const { $gettext } = useGettext()
@@ -28,6 +29,7 @@ const emit = defineEmits<{
 }>()
 
 const api = useNotesApi()
+const { onDragStart, onDragEnd } = useDragNote()
 const loading = ref(false)
 const creating = ref(false)
 const error = ref<string | null>(null)
@@ -161,7 +163,7 @@ function formatShort(ts: number): string {
     </header>
 
     <p v-if="loading" class="empty-msg">…</p>
-    <p v-else-if="error" class="error-msg">{{ error }}</p>
+    <p v-else-if="error || state.dropError" class="error-msg">{{ error || state.dropError }}</p>
     <p v-else-if="!groups.length" class="empty-msg">
       {{ $gettext('No notes yet') }}. {{ $gettext('Start by creating your first note.') }}
     </p>
@@ -177,6 +179,9 @@ function formatShort(ts: number): string {
             v-for="note in g.notes"
             :key="note.id"
             :class="['note-item', { selected: state.activeNote?.id === note.id }]"
+            draggable="true"
+            @dragstart="onDragStart($event, note)"
+            @dragend="onDragEnd()"
             @click="emit('selectNote', note)"
           >
             <span class="title">
