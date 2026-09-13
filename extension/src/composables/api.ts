@@ -2,6 +2,7 @@ import { useClientService } from '@opencloud-eu/web-pkg'
 import type { Note } from '../stores/notes'
 
 const BASE = '/index.php/apps/notes/api/v1'
+const BASE14 = '/index.php/apps/notes/api/v1.4'
 
 export interface Settings {
   notesPath: string
@@ -52,6 +53,22 @@ export function useNotesApi() {
       if (!urls.length) return {}
       const { data } = await client.httpAuthenticated.post(`${BASE}/img/sign`, { urls })
       return (data as { signed?: Record<string, string> }).signed ?? {}
+    },
+    uploadAttachment: async (noteId: number, file: File): Promise<string> => {
+      const form = new FormData()
+      form.append('file', file)
+      const { data } = await client.httpAuthenticated.post<{ filename: string }>(
+        `${BASE14}/attachment/${noteId}`,
+        form,
+      )
+      return data.filename
+    },
+    getAttachmentBlob: async (noteId: number, path: string): Promise<Blob> => {
+      const { data } = await client.httpAuthenticated.get<Blob>(`${BASE14}/attachment/${noteId}`, {
+        params: { path },
+        responseType: 'blob',
+      })
+      return data
     },
   }
 }
