@@ -614,12 +614,6 @@
   display: none;
 }
 
-.zen-mode.notes-app .note-editor {
-  width: 100%;
-  max-width: 1440px;
-  margin: 0 auto;
-}
-
 /* Messages */
 .empty-msg {
   text-align: center;
