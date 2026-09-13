@@ -714,6 +714,11 @@
   margin-top: 0.5rem;
 }
 
+.btn-danger {
+  --oc-button-color: var(--oc-role-error);
+  --oc-button-on-color: var(--oc-role-on-error);
+}
+
 
 
 
