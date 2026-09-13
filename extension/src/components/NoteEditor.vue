@@ -26,9 +26,11 @@ import type { Note } from '../stores/notes'
 import { state, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
 import { useIsDark } from '../composables/theme'
+import { useGettext } from 'vue3-gettext'
 import ModalDialog from './ModalDialog.vue'
 
 const isDark = useIsDark()
+const { $gettext } = useGettext()
 
 const saveClasses = computed(() => [
   'btn-save',
@@ -58,6 +60,10 @@ const showEmoji = ref(false)
 const showConfirmDelete = ref(false)
 
 const ta = ref<HTMLTextAreaElement | null>(null)
+
+const uploading = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+const attachmentUrls = new Map<string, string>()
 
 const isPreview = computed(() => state.displayMode === 'preview')
 
@@ -136,6 +142,7 @@ function redo() {
 watch(
   () => props.note,
   (n) => {
+    revokeAttachments()
     title.value = n.title
     content.value = n.content
     history.value = [n.content]
@@ -221,6 +228,73 @@ function insertAtCursor(text: string) {
     s + text.length,
     s + text.length,
   )
+}
+
+/* ----- attachments ----- */
+const ATTACHMENT_ESCAPE_RE = /[ ()%#?]/g
+
+function encodeAttachmentPath(path: string): string {
+  return path.replace(ATTACHMENT_ESCAPE_RE, (ch) => {
+    const hex = ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')
+    return `%${hex}`
+  })
+}
+
+function decodeAttachmentPath(raw: string): string {
+  const path = raw.startsWith('./') ? raw.slice(2) : raw
+  try {
+    return decodeURIComponent(path)
+  } catch {
+    return path
+  }
+}
+
+function attachmentError(e: unknown): string {
+  const status = (e as { response?: { status?: number } } | null)?.response?.status
+  if (status === 413) {
+    return $gettext('The file is too large. The maximum size is 32 MiB.')
+  }
+  return $gettext('Failed to attach the file.')
+}
+
+function openAttachmentPicker() {
+  fileInput.value?.click()
+}
+
+function insertAttachmentRef(text: string) {
+  const el = ta.value
+  if (!el) {
+    pushHistory(content.value)
+    content.value += content.value ? `\n${text}` : text
+    return
+  }
+  const { selectionStart: s, selectionEnd: e, value } = el
+  applyEdit(
+    value.slice(0, s) + text + value.slice(e),
+    s + text.length,
+    s + text.length,
+  )
+}
+
+async function onAttachmentSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  uploading.value = true
+  error.value = null
+  try {
+    const filename = await api.uploadAttachment(props.note.id, file)
+    const target = encodeAttachmentPath(filename)
+    const reference = file.type.startsWith('image/')
+      ? `![${file.name}](${target})`
+      : `[${file.name}](${target})`
+    insertAttachmentRef(reference)
+  } catch (err) {
+    error.value = attachmentError(err)
+  } finally {
+    uploading.value = false
+  }
 }
 
 const TABLE = '| Column | Column |\n| --- | --- |\n| Text | Text |'
@@ -322,6 +396,7 @@ function closeEmoji() {
 
 onMounted(() => window.addEventListener('click', closeEmoji))
 onBeforeUnmount(() => window.removeEventListener('click', closeEmoji))
+onBeforeUnmount(revokeAttachments)
 
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
@@ -356,6 +431,40 @@ function extractImageUrls(src: string): string[] {
   return [...urls].slice(0, 32)
 }
 
+function revokeAttachments() {
+  for (const url of attachmentUrls.values()) URL.revokeObjectURL(url)
+  attachmentUrls.clear()
+}
+
+async function resolveAttachments(html: string): Promise<string> {
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const nodes = [
+    ...doc.querySelectorAll<HTMLImageElement>('img[src^=".attachments."]'),
+    ...doc.querySelectorAll<HTMLAnchorElement>('a[href^=".attachments."]'),
+  ]
+  await Promise.all(
+    nodes.map(async (node) => {
+      const raw =
+        node.tagName === 'IMG' ? node.getAttribute('src') : node.getAttribute('href')
+      if (!raw) return
+      const path = decodeAttachmentPath(raw)
+      try {
+        let url = attachmentUrls.get(path)
+        if (!url) {
+          const blob = await api.getAttachmentBlob(props.note.id, path)
+          url = URL.createObjectURL(blob)
+          attachmentUrls.set(path, url)
+        }
+        if (node.tagName === 'IMG') node.setAttribute('src', url)
+        else node.setAttribute('href', url)
+      } catch {
+        // keep the relative reference as-is on failure
+      }
+    }),
+  )
+  return doc.body.innerHTML
+}
+
 async function buildPreview(src: string): Promise<string> {
   let text = src
   const urls = extractImageUrls(src)
@@ -369,7 +478,8 @@ async function buildPreview(src: string): Promise<string> {
       // sin firma las imágenes no cargarán, pero el resto del markdown sí
     }
   }
-  return DOMPurify.sanitize(md.render(text), { ADD_ATTR: ['target'] })
+  const html = DOMPurify.sanitize(md.render(text), { ADD_ATTR: ['target'] })
+  return resolveAttachments(html)
 }
 
 const defaultLink =
@@ -520,11 +630,13 @@ watch(
       </button>
       <button
         class="oc-button oc-button-raw md-btn"
-        disabled
-        :title="$gettext('Attachments are not available yet')"
+        :disabled="uploading"
+        :title="$gettext('Attach file')"
+        @click="openAttachmentPicker"
       >
         <Paperclip :size="16" />
       </button>
+      <input ref="fileInput" type="file" hidden @change="onAttachmentSelected" />
       <div class="emoji-wrap">
         <button
           class="oc-button oc-button-raw md-btn"
