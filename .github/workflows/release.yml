@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'notes-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: 'pnpm'
+          cache-dependency-path: extension/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: extension
+        run: pnpm install
+
+      - name: Build
+        working-directory: extension
+        run: pnpm build
+
+      - name: Package
+        run: |
+          TAG=${GITHUB_REF_NAME}
+          APP=${TAG%-v*}
+          VERSION=${TAG##*-v}
+          mkdir -p "apps/${APP}"
+          cp -r extension/dist/. "apps/${APP}/"
+          cd apps
+          zip -r "../${APP}-${VERSION}.zip" "${APP}/"
+          cd ..
+          ls -la *.zip
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: '*.zip'
+          generate_release_notes: true
