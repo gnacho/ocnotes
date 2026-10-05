@@ -8,21 +8,24 @@
     "build": "vite build"
   },
   "devDependencies": {
-    "@opencloud-eu/extension-sdk": "^7.0.0",
-    "@opencloud-eu/tsconfig": "^7.0.0",
-    "@opencloud-eu/web-client": "^7.0.0",
-    "@opencloud-eu/web-pkg": "^7.0.0",
+    "@opencloud-eu/extension-sdk": "^7.4.0",
+    "@opencloud-eu/tsconfig": "^7.4.0",
+    "@opencloud-eu/web-client": "^7.4.0",
+    "@opencloud-eu/web-pkg": "^7.4.0",
     "@types/markdown-it": "^14.2.0",
+    "dompurify": "^3.4.16",
     "lucide-vue-next": "^1.0.0",
+    "markdown-it": "^15.0.2",
     "typescript": "^6.0.0",
-    "vite": "^8.0.0",
-    "vue": "^3.5.13",
-    "vue-router": "^5.0.0",
-    "vue-tsc": "^3.0.0",
+    "vite": "^8.3.2",
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1",
+    "vue-tsc": "^3.3.12",
     "vue3-gettext": "^4.0.0-beta.1"
   },
-  "dependencies": {
-    "dompurify": "^3.2.7",
-    "markdown-it": "^15.0.0"
+  "overrides": {
+    "axios": "^1.20.0",
+    "adm-zip": "^0.6.1",
+    "ws": "^8.21.3"
   }
 }
