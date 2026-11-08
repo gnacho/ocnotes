@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { PanelLeft, StickyNote } from 'lucide-vue-next'
+import { StickyNote } from 'lucide-vue-next'
 import SidebarNav from '../components/SidebarNav.vue'
 import NoteList from '../components/NoteList.vue'
 import NoteEditor from '../components/NoteEditor.vue'
@@ -146,17 +146,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
 
 <template>
   <main :class="['notes-app', { 'zen-mode': state.zenMode }]">
-    <header class="notes-topbar">
-      <button
-        class="oc-button oc-button-raw icon-btn"
-        :aria-label="$gettext('Toggle sidebar')"
-        @click="state.sidebarOpen = !state.sidebarOpen"
-      >
-        <PanelLeft :size="18" />
-      </button>
-      <h1 class="notes-title">{{ $gettext('Notes') }}</h1>
-    </header>
-
     <div class="notes-body">
       <aside v-if="state.sidebarOpen && !state.zenMode" class="notes-sidebar">
         <SidebarNav @request-new-note="newNote" />
