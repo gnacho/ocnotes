@@ -8,6 +8,7 @@
   height: 100%;
   color: var(--oc-role-on-surface);
   background: var(--oc-role-surface);
+  font-family: var(--font-family, Inter, sans-serif);
 }
 
 .notes-app button {
@@ -88,9 +89,9 @@
   gap: 8px;
   width: 100%;
   margin-top: 2px;
-  padding: 6px 8px;
+  padding: 12px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10.5px;
   background: none;
   color: var(--oc-role-on-surface-variant);
   font-family: inherit;
@@ -116,17 +117,17 @@
 .nav-list {
   list-style: none;
   padding: 0;
-  margin: 0;
+  margin: 12px 0 0;
 }
 
 .nav-list li button {
   width: 100%;
   text-align: left;
-  padding: 6px 8px;
+  padding: 12px 8px;
   border: none;
   background: none;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 10.5px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -190,11 +191,11 @@
 }
 
 .note-list-header {
-  padding: 0.6rem 0.75rem 0.5rem;
+  padding: 12px 12px 8px;
   border-bottom: 1px solid var(--oc-role-outline-variant);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
 .btn-new {
@@ -231,13 +232,13 @@
 .group-header {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.72rem;
+  gap: 6px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--oc-role-on-surface-variant);
   margin: 0;
-  padding: 0.6rem 0.85rem 0.25rem;
+  padding: 8px 12px 4px;
   position: sticky;
   top: 0;
   background: var(--oc-role-surface);
@@ -260,12 +261,12 @@
 }
 
 .note-item {
-  padding: 0.6rem 0.85rem;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--oc-role-outline-variant);
   cursor: grab;
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 2px;
 }
 
 .note-item:hover {
@@ -277,8 +278,8 @@
 }
 
 .note-item .title {
-  font-weight: 700;
-  font-size: 0.92rem;
+  font-weight: 600;
+  font-size: 14px;
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -288,7 +289,7 @@
 }
 
 .note-item .preview {
-  font-size: 0.8rem;
+  font-size: 13px;
   color: var(--oc-role-on-surface-variant);
   white-space: nowrap;
   overflow: hidden;
@@ -297,8 +298,8 @@
 
 .note-item .meta {
   display: flex;
-  gap: 0.5rem;
-  font-size: 0.72rem;
+  gap: 8px;
+  font-size: 12px;
   color: var(--oc-role-on-surface-variant);
 }
 
