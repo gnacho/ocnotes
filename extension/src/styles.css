@@ -14,12 +14,11 @@
   font-family: inherit;
 }
 
-/* OpenCloud 9 moved the button metrics (padding, min-height, gap) into the
-   utility classes of the oc-button component. Raw .oc-button elements in
-   this app need them back or they render cramped. */
+/* OpenCloud 9 keeps the button padding in the design system, but the gap
+   between icon and label only exists on the oc-button component. Raw
+   .oc-button elements in this app need it, plus a usable tap height. */
 .notes-app .oc-button:not(.oc-button-raw) {
   gap: 0.5rem;
-  padding-inline: 0.75rem;
   min-height: 2.25rem;
 }
 
