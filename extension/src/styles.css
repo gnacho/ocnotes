@@ -14,6 +14,15 @@
   font-family: inherit;
 }
 
+/* OpenCloud 9 moved the button metrics (padding, min-height, gap) into the
+   utility classes of the oc-button component. Raw .oc-button elements in
+   this app need them back or they render cramped. */
+.notes-app .oc-button:not(.oc-button-raw) {
+  gap: 0.5rem;
+  padding-inline: 0.75rem;
+  min-height: 2.25rem;
+}
+
 /* Top bar */
 .notes-topbar {
   display: flex;
