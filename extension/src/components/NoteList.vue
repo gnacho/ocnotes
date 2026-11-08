@@ -145,13 +145,14 @@ function formatShort(ts: number): string {
       />
     </header>
 
-    <p v-if="loading" class="empty-msg">…</p>
-    <p v-else-if="error || state.dropError" class="error-msg">{{ error || state.dropError }}</p>
-    <p v-else-if="!groups.length" class="empty-msg">
-      {{ $gettext('No notes yet') }}. {{ $gettext('Start by creating your first note.') }}
-    </p>
+    <div class="note-list-scroll">
+      <p v-if="loading" class="empty-msg">…</p>
+      <p v-else-if="error || state.dropError" class="error-msg">{{ error || state.dropError }}</p>
+      <p v-else-if="!groups.length" class="empty-msg">
+        {{ $gettext('No notes yet') }}. {{ $gettext('Start by creating your first note.') }}
+      </p>
 
-    <template v-else>
+      <template v-else>
       <section v-for="g in groups" :key="g.key" class="note-group">
         <h3 v-if="g.label" :class="['group-header', { favorites: g.favorites }]">
           <Star v-if="g.favorites" :size="13" class="fav-star" />
@@ -181,8 +182,9 @@ function formatShort(ts: number): string {
               <span v-if="note.category" class="category">{{ note.category.split('/').pop() }}</span>
             </span>
           </li>
-        </ul>
-      </section>
-    </template>
+          </ul>
+        </section>
+      </template>
+    </div>
   </div>
 </template>
