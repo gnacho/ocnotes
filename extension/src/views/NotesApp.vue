@@ -159,7 +159,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onGlobalKey))
 
     <div class="notes-body">
       <aside v-if="state.sidebarOpen && !state.zenMode" class="notes-sidebar">
-        <SidebarNav />
+        <SidebarNav @request-new-note="newNote" />
       </aside>
 
       <section
