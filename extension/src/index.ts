@@ -34,7 +34,7 @@ export default defineWebApplication({
     const appInfo = {
       id: 'notes',
       name: $gettext('Notes'),
-      icon: 'sticky-note-line',
+      icon: 'sticky-note',
       color: 'var(--oc-role-secondary)'
     }
 
