@@ -4,6 +4,7 @@ import {
   FolderPlus,
   Maximize2,
   Minimize2,
+  Plus,
   Settings,
   Keyboard,
   FileText,
@@ -13,21 +14,29 @@ import { state, setCurrentCategory, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
 import { useDragNote } from '../composables/useDragNote'
 import ModalDialog from './ModalDialog.vue'
+import { useGettext } from 'vue3-gettext'
 
 const api = useNotesApi()
+const { $gettext } = useGettext()
 const { onDragOverCategory, onDragLeaveCategory, onDropOnCategory } = useDragNote()
 
-const createCategoryClasses = computed(() => [
-  'btn-new-category',
-  'oc-button',
-  'oc-button-primary',
-  'oc-button-filled',
-  'ext:w-full',
-  'ext:shadow-md',
-  'ext:duration-150',
-  'ext:ease-out',
-  'ext:hover:brightness-110',
-])
+const emit = defineEmits<{ requestNewNote: [] }>()
+
+/* Zen mode works on the active note. With an empty account there is none, so
+   the first click creates a blank note instead of leaving the button dead. */
+async function onZenMode() {
+  if (!state.activeNote) {
+    const category = state.currentCategory === '__none__' ? '' : state.currentCategory
+    try {
+      const n = await api.createNote($gettext('Untitled'), '', category)
+      state.notes = [n, ...state.notes]
+      state.activeNote = n
+    } catch {
+      return
+    }
+  }
+  toggleZenMode()
+}
 
 const showNewCategory = ref(false)
 const showSettings = ref(false)
@@ -124,9 +133,9 @@ async function saveSettings() {
 <template>
   <nav class="sidebar-nav" aria-label="Notes navigation">
     <div class="sidebar-top">
-      <button :class="createCategoryClasses" @click="showNewCategory = true">
-        <FolderPlus :size="16" />
-        {{ $gettext('New category') }}
+      <button class="btn-new oc-button oc-button-primary oc-button-filled" @click="emit('requestNewNote')">
+        <Plus :size="16" />
+        {{ $gettext('New note') }}
       </button>
 
       <ul class="nav-list">
@@ -165,10 +174,15 @@ async function saveSettings() {
           </button>
         </li>
       </ul>
+
+      <button class="btn-add-category" @click="showNewCategory = true">
+        <FolderPlus :size="14" />
+        {{ $gettext('New category') }}
+      </button>
     </div>
 
     <div class="sidebar-bottom">
-      <button :disabled="!state.activeNote" @click="state.activeNote && toggleZenMode()">
+      <button @click="onZenMode()">
         <Maximize2 v-if="!state.zenMode" :size="15" />
         <Minimize2 v-else :size="15" />
         {{ $gettext('Zen mode') }}
