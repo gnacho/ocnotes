@@ -35,7 +35,7 @@ export default defineWebApplication({
       id: 'notes',
       name: $gettext('Notes'),
       icon: 'sticky-note-line',
-      color: '#ee7318'
+      color: 'var(--oc-role-secondary)'
     }
 
     // UNA sola ruta por path (issue #001): el host monta bajo /notes.
