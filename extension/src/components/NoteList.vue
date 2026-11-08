@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useGettext } from 'vue3-gettext'
-import { Plus, Star } from 'lucide-vue-next'
+import { PanelLeft, Plus, Star } from 'lucide-vue-next'
 import type { Note } from '../stores/notes'
 import { state } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
@@ -121,10 +121,20 @@ function formatShort(ts: number): string {
 <template>
   <div class="note-list">
     <header class="note-list-header">
-      <button :class="createClasses" @click="emit('requestNewNote')">
-        <Plus :size="16" />
-        {{ $gettext('New note') }}
-      </button>
+      <div class="note-list-actions">
+        <button
+          class="oc-button oc-button-raw icon-btn"
+          :aria-label="$gettext('Toggle sidebar')"
+          :title="$gettext('Toggle sidebar')"
+          @click="state.sidebarOpen = !state.sidebarOpen"
+        >
+          <PanelLeft :size="18" />
+        </button>
+        <button :class="createClasses" @click="emit('requestNewNote')">
+          <Plus :size="16" />
+          {{ $gettext('New note') }}
+        </button>
+      </div>
       <input
         id="notes-search"
         v-model="state.searchQuery"
