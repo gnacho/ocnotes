@@ -218,15 +218,13 @@
   box-sizing: border-box;
 }
 
-.note-list > .note-group,
-.note-list > .empty-msg,
-.note-list > .error-msg {
-  overflow-y: auto;
-}
-
-.note-group {
+/* Un solo scroll para toda la lista: antes cada mes era su propia caja con
+   flex:1 y scroll, asi que los grupos se repartian la altura de la columna y
+   dejaban un blanco grande entre un mes y el siguiente. */
+.note-list-scroll {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
 }
 
 .group-header {
