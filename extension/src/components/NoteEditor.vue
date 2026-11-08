@@ -25,22 +25,20 @@ import {
 import type { Note } from '../stores/notes'
 import { state, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
-import { useIsDark } from '../composables/theme'
 import { useGettext } from 'vue3-gettext'
 import ModalDialog from './ModalDialog.vue'
 
-const isDark = useIsDark()
 const { $gettext } = useGettext()
 
 const saveClasses = computed(() => [
   'btn-save',
+  'oc-button',
+  'oc-button-primary',
+  'oc-button-filled',
   'shadow-md',
   'hover:brightness-110',
   'duration-150',
   'ease-out',
-  isDark.value
-    ? 'oc-button-filled oc-button-primary-container !bg-gradient-to-r !from-role-secondary-container !to-role-primary-container'
-    : 'oc-button-filled oc-button-primary !bg-gradient-to-r !from-role-secondary !to-role-primary',
 ])
 
 const emit = defineEmits<{

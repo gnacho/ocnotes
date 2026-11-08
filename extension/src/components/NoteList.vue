@@ -5,22 +5,20 @@ import { Plus, Star } from 'lucide-vue-next'
 import type { Note } from '../stores/notes'
 import { state } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
-import { useIsDark } from '../composables/theme'
 import { useDragNote } from '../composables/useDragNote'
 
 const { $gettext } = useGettext()
-const isDark = useIsDark()
 
 const createClasses = computed(() => [
   'btn-new',
+  'oc-button',
+  'oc-button-primary',
+  'oc-button-filled',
+  'ext:w-full',
   'ext:shadow-md',
   'ext:duration-150',
   'ext:ease-out',
   'ext:hover:brightness-110',
-  'ext:w-full',
-  isDark.value
-    ? 'oc-button-filled oc-button-primary-container ext:!bg-gradient-to-r ext:!from-role-secondary-container ext:!to-role-primary-container'
-    : 'oc-button-filled oc-button-primary ext:!bg-gradient-to-r ext:!from-role-secondary ext:!to-role-primary',
 ])
 
 const emit = defineEmits<{
