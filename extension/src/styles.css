@@ -475,6 +475,33 @@
   min-height: 0;
 }
 
+/* WYSIWYG editor (host tiptap). The host styles already make
+   .text-editor-content scroll internally; here we only give the provider a
+   definite height inside our flex column. */
+.editor-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-wrap .text-editor-provider {
+  height: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.editor-wrap .text-editor-toolbar {
+  flex-shrink: 0;
+}
+
+.editor-content-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .title-input {
   width: 100%;
   font-size: 1.4rem;

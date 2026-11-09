@@ -1,27 +1,20 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   AlignLeft,
-  Bold,
-  Code,
   Eye,
-  Heading2,
-  Italic,
-  Link2,
-  List,
-  ListOrdered,
   Minimize2,
   Paperclip,
-  Redo2,
-  Smile,
   Star,
-  Strikethrough,
-  Table,
-  TextQuote,
   Trash2,
   Type,
-  Undo2,
 } from 'lucide-vue-next'
+import {
+  useTextEditor,
+  TextEditorProvider,
+  TextEditorContent,
+  TextEditorToolbar,
+} from '@opencloud-eu/web-pkg/editor'
 import type { Note } from '../stores/notes'
 import { state, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
@@ -52,15 +45,9 @@ const props = defineProps<{
 const api = useNotesApi()
 const title = ref(props.note.title)
 const content = ref(props.note.content)
-const isDirty = computed(
-  () => title.value !== props.note.title || content.value !== props.note.content,
-)
 const saving = ref(false)
 const error = ref<string | null>(null)
-const showEmoji = ref(false)
 const showConfirmDelete = ref(false)
-
-const ta = ref<HTMLTextAreaElement | null>(null)
 
 const uploading = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -80,6 +67,43 @@ const editorStyle = computed(() => ({
   fontSize: `${state.editorFontSize}px`,
 }))
 
+/* ----- WYSIWYG editor (host tiptap, markdown round-trip) ----- */
+const editor = useTextEditor({
+  contentType: 'markdown',
+  modelValue: content,
+  onUpdate: (c) => {
+    content.value = c
+  },
+  placeholder: $gettext('Content'),
+  ariaLabel: $gettext('Content'),
+  // Images stay in Preview (proxy + attachments); source mode is driven by
+  // the header "plain" toggle, not by the toolbar's own button.
+  excludeActions: ['source-mode', 'image', 'image-url', 'image-upload', 'image-cloud'],
+})
+
+// Keep the header "rich/plain" toggle in sync with the editor's source mode.
+watch(
+  () => state.displayMode,
+  (mode) => {
+    editor.state.sourceMode.value = mode === 'plain'
+  },
+)
+
+const isDirty = computed(
+  () => title.value !== props.note.title || content.value !== props.note.content,
+)
+
+function currentContent(): string {
+  return editor.getContent()
+}
+
+// Live dirty check for the note-switch / new-note guards in NotesApp: reads the
+// editor content directly instead of the debounced `content` ref, so a switch
+// right after typing cannot drop the last keystrokes.
+function isDirtyNow(): boolean {
+  return title.value !== props.note.title || currentContent() !== props.note.content
+}
+
 const categories = computed(() => {
   const set = new Set<string>()
   for (const n of state.notes) {
@@ -89,67 +113,13 @@ const categories = computed(() => {
   return [...set].sort((a, b) => a.localeCompare(b))
 })
 
-/* ----- undo/redo history for the content ----- */
-const history = ref<string[]>([props.note.content])
-let hIndex = 0
-let suppressHistory = false
-let pushTimer: number | undefined
-
-function pushHistory(snapshot: string) {
-  if (snapshot === history.value[hIndex]) return
-  history.value = history.value.slice(0, hIndex + 1)
-  history.value.push(snapshot)
-  if (history.value.length > 100) history.value.shift()
-  hIndex = history.value.length - 1
-  canUndo.value = hIndex > 0
-  canRedo.value = hIndex < history.value.length - 1
-}
-
-const canUndo = ref(false)
-const canRedo = ref(false)
-
-watch(content, (v) => {
-  if (suppressHistory) return
-  window.clearTimeout(pushTimer)
-  pushTimer = window.setTimeout(() => pushHistory(v), 500)
-})
-
-function undo() {
-  if (hIndex <= 0) return
-  hIndex--
-  suppressHistory = true
-  content.value = history.value[hIndex]
-  canUndo.value = hIndex > 0
-  canRedo.value = hIndex < history.value.length - 1
-  void nextTick(() => {
-    suppressHistory = false
-    ta.value?.focus()
-  })
-}
-
-function redo() {
-  if (hIndex >= history.value.length - 1) return
-  hIndex++
-  suppressHistory = true
-  content.value = history.value[hIndex]
-  canUndo.value = hIndex > 0
-  canRedo.value = hIndex < history.value.length - 1
-  void nextTick(() => {
-    suppressHistory = false
-    ta.value?.focus()
-  })
-}
-
 function resetTo(n: Note) {
   revokeAttachments()
   title.value = n.title
   content.value = n.content
-  history.value = [n.content]
-  hIndex = 0
-  canUndo.value = false
-  canRedo.value = false
+  editor.setContent(n.content)
   error.value = null
-  showEmoji.value = false
+  showConfirmDelete.value = false
 }
 
 watch(() => props.note, resetTo)
@@ -157,82 +127,6 @@ watch(() => props.note, resetTo)
 // Clear the pending edits, used when the user chooses to discard them.
 function discard() {
   resetTo(props.note)
-}
-
-/* ----- markdown editing helpers ----- */
-function applyEdit(next: string, selStart: number, selEnd: number) {
-  pushHistory(content.value)
-  window.clearTimeout(pushTimer)
-  content.value = next
-  void nextTick(() => {
-    const el = ta.value
-    if (el) {
-      el.selectionStart = selStart
-      el.selectionEnd = selEnd
-      el.focus()
-    }
-  })
-}
-
-function wrap(before: string, after: string, placeholder: string) {
-  const el = ta.value
-  if (!el) return
-  const { selectionStart: s, selectionEnd: e, value } = el
-  const sel = value.slice(s, e) || placeholder
-  applyEdit(
-    value.slice(0, s) + before + sel + after + value.slice(e),
-    s + before.length,
-    s + before.length + sel.length,
-  )
-}
-
-function toggleLinePrefix(prefix: string) {
-  const el = ta.value
-  if (!el) return
-  const { selectionStart: s, selectionEnd: e, value } = el
-  const ls = value.lastIndexOf('\n', s - 1) + 1
-  const nl = value.indexOf('\n', e)
-  const le = nl === -1 ? value.length : nl
-  const block = value.slice(ls, le)
-  const lines = block.split('\n')
-  const numbered = /^\d+\.\s/.test(prefix)
-  const all = lines.every((l) =>
-    numbered ? /^\d+\.\s/.test(l) : l.startsWith(prefix),
-  )
-  const next = lines
-    .map((l, i) => {
-      if (all) {
-        if (numbered) return l.replace(/^\d+\.\s/, '')
-        return l.slice(prefix.length)
-      }
-      return numbered ? `${i + 1}. ${l}` : prefix + l
-    })
-    .join('\n')
-  applyEdit(value.slice(0, ls) + next + value.slice(le), ls, ls + next.length)
-}
-
-function insertBlock(text: string) {
-  const el = ta.value
-  if (!el) return
-  const { selectionStart: s, selectionEnd: e, value } = el
-  const atLineStart = s === 0 || value[s - 1] === '\n'
-  const block = atLineStart ? text : `\n${text}`
-  applyEdit(
-    value.slice(0, s) + block + value.slice(e),
-    s + block.length,
-    s + block.length,
-  )
-}
-
-function insertAtCursor(text: string) {
-  const el = ta.value
-  if (!el) return
-  const { selectionStart: s, selectionEnd: e, value } = el
-  applyEdit(
-    value.slice(0, s) + text + value.slice(e),
-    s + text.length,
-    s + text.length,
-  )
 }
 
 /* ----- attachments ----- */
@@ -267,18 +161,16 @@ function openAttachmentPicker() {
 }
 
 function insertAttachmentRef(text: string) {
-  const el = ta.value
-  if (!el) {
-    pushHistory(content.value)
-    content.value += content.value ? `\n${text}` : text
-    return
-  }
-  const { selectionStart: s, selectionEnd: e, value } = el
-  applyEdit(
-    value.slice(0, s) + text + value.slice(e),
-    s + text.length,
-    s + text.length,
-  )
+  const ed = editor.editor.value
+  if (!ed) return
+  // The host editor's Markdown extension accepts markdown strings via
+  // insertContent({ contentType: 'markdown' }); that option type lives in the
+  // @tiptap/markdown module augmentation, which is a transitive dep of web-pkg
+  // and not part of this program's type graph.
+  ed.chain()
+    .focus()
+    .insertContent(text, { contentType: 'markdown' } as any)
+    .run()
 }
 
 async function onAttachmentSelected(e: Event) {
@@ -302,29 +194,12 @@ async function onAttachmentSelected(e: Event) {
   }
 }
 
-const TABLE = '| Column | Column |\n| --- | --- |\n| Text | Text |'
-const EMOJIS = [
-  '😀', '😂', '🙂', '😍', '🤔', '😎', '🥳', '🙄',
-  '😴', '😢', '😭', '🥺', '😡', '🤯', '😇', '🥰',
-  '👍', '👏', '🙏', '💪', '✅', '⚠️', '❌', '⭐',
-  '❤️', '🔥', '✨', '🎉', '💡', '🚀', '📌', '🔗',
-  '📎', '🤖', '🐱', '🐶', '☕', '🍕', '⚽', '🌙',
-]
-
 /* ----- keyboard ----- */
-function onKeydown(e: KeyboardEvent) {
+function onWindowKeydown(e: KeyboardEvent) {
   const mod = e.ctrlKey || e.metaKey
-  if (!mod) return
-  const k = e.key.toLowerCase()
-  if (k === 's') {
+  if (mod && e.key.toLowerCase() === 's') {
     e.preventDefault()
     void save()
-  } else if (k === 'z' && !e.shiftKey) {
-    e.preventDefault()
-    undo()
-  } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
-    e.preventDefault()
-    redo()
   }
 }
 
@@ -333,9 +208,10 @@ async function save() {
   saving.value = true
   error.value = null
   try {
+    const current = editor.getContent()
     const payload: Partial<Note> = {}
     if (title.value !== props.note.title) payload.title = title.value
-    if (content.value !== props.note.content) payload.content = content.value
+    if (current !== props.note.content) payload.content = current
     if (!Object.keys(payload).length) return
     const resp = await api.updateNote(props.note.id, payload, props.note.etag)
     const updated = (resp as { data?: Note }).data
@@ -343,6 +219,7 @@ async function save() {
       etag: updated?.etag ?? props.note.etag,
       modified: updated?.modified ?? Date.now() / 1000,
     })
+    content.value = current
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -395,12 +272,8 @@ async function changeCategory(cat: string) {
   }
 }
 
-function closeEmoji() {
-  showEmoji.value = false
-}
-
-onMounted(() => window.addEventListener('click', closeEmoji))
-onBeforeUnmount(() => window.removeEventListener('click', closeEmoji))
+onMounted(() => window.addEventListener('keydown', onWindowKeydown))
+onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown))
 onBeforeUnmount(revokeAttachments)
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -514,11 +387,11 @@ const previewHtml = ref('')
 let previewTimer: number | undefined
 watch(
   [content, isPreview],
-  ([c, p]) => {
+  ([, p]) => {
     if (!p) return
     window.clearTimeout(previewTimer)
     previewTimer = window.setTimeout(() => {
-      void buildPreview(c).then((h) => {
+      void buildPreview(currentContent()).then((h) => {
         previewHtml.value = h
       })
     }, 250)
@@ -526,7 +399,7 @@ watch(
   { immediate: true },
 )
 
-defineExpose({ isDirty: () => isDirty.value, save, discard })
+defineExpose({ isDirty: isDirtyNow, save, discard })
 </script>
 
 <template>
@@ -550,6 +423,17 @@ defineExpose({ isDirty: () => isDirty.value, save, discard })
       >
         <Star :size="18" />
       </button>
+      <button
+        v-if="!isPreview"
+        class="oc-button oc-button-raw icon-btn"
+        :disabled="uploading"
+        :aria-label="$gettext('Attach file')"
+        :title="$gettext('Attach file')"
+        @click="openAttachmentPicker"
+      >
+        <Paperclip :size="18" />
+      </button>
+      <input ref="fileInput" type="file" hidden @change="onAttachmentSelected" />
       <button
         :class="['oc-button oc-button-raw icon-btn', { active: state.displayMode === 'rich' }]"
         :aria-label="$gettext('Rich text')"
@@ -595,100 +479,17 @@ defineExpose({ isDirty: () => isDirty.value, save, discard })
       </button>
     </header>
 
-    <div v-if="!isPreview" class="md-toolbar">
-      <button class="oc-button oc-button-raw md-btn" :disabled="!canUndo" :title="$gettext('Undo')" @click="undo">
-        <Undo2 :size="16" />
-      </button>
-      <button class="oc-button oc-button-raw md-btn" :disabled="!canRedo" :title="$gettext('Redo')" @click="redo">
-        <Redo2 :size="16" />
-      </button>
-      <span class="md-sep" />
-      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Bold')" @click="wrap('**', '**', 'text')">
-        <Bold :size="16" />
-      </button>
-      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Italic')" @click="wrap('*', '*', 'text')">
-        <Italic :size="16" />
-      </button>
-      <button
-        class="oc-button oc-button-raw md-btn"
-        :title="$gettext('Strikethrough')"
-        @click="wrap('~~', '~~', 'text')"
-      >
-        <Strikethrough :size="16" />
-      </button>
-      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Heading')" @click="toggleLinePrefix('## ')">
-        <Heading2 :size="16" />
-      </button>
-      <span class="md-sep" />
-      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Bulleted list')" @click="toggleLinePrefix('- ')">
-        <List :size="16" />
-      </button>
-      <button
-        class="oc-button oc-button-raw md-btn"
-        :title="$gettext('Numbered list')"
-        @click="toggleLinePrefix('1. ')"
-      >
-        <ListOrdered :size="16" />
-      </button>
-      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Quote')" @click="toggleLinePrefix('> ')">
-        <TextQuote :size="16" />
-      </button>
-      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Code')" @click="wrap('`', '`', 'code')">
-        <Code :size="16" />
-      </button>
-      <span class="md-sep" />
-      <button class="oc-button oc-button-raw md-btn" :title="$gettext('Table')" @click="insertBlock(TABLE)">
-        <Table :size="16" />
-      </button>
-      <button
-        class="oc-button oc-button-raw md-btn"
-        :title="$gettext('Link')"
-        @click="wrap('[', '](url)', 'text')"
-      >
-        <Link2 :size="16" />
-      </button>
-      <button
-        class="oc-button oc-button-raw md-btn"
-        :disabled="uploading"
-        :title="$gettext('Attach file')"
-        @click="openAttachmentPicker"
-      >
-        <Paperclip :size="16" />
-      </button>
-      <input ref="fileInput" type="file" hidden @change="onAttachmentSelected" />
-      <div class="emoji-wrap">
-        <button
-          class="oc-button oc-button-raw md-btn"
-          :title="$gettext('Emoji')"
-          @click.stop="showEmoji = !showEmoji"
-        >
-          <Smile :size="16" />
-        </button>
-        <div v-if="showEmoji" class="emoji-pop" @click.stop>
-          <button
-            v-for="e in EMOJIS"
-            :key="e"
-            class="emoji-item"
-            @click="insertAtCursor(e)"
-          >
-            {{ e }}
-          </button>
-        </div>
-      </div>
-    </div>
-
     <main class="editor-body">
       <input v-model="title" :placeholder="$gettext('Title')" class="title-input" />
-      <textarea
-        v-if="!isPreview"
-        ref="ta"
-        v-model="content"
-        :style="editorStyle"
-        :placeholder="$gettext('Content')"
-        class="content-textarea"
-        @keydown="onKeydown"
-      />
-      <div v-else :style="editorStyle" class="preview-pane" v-html="previewHtml" />
+      <div v-show="!isPreview" class="editor-wrap">
+        <TextEditorProvider :editor="editor">
+          <TextEditorToolbar />
+          <div class="editor-content-wrap" :style="editorStyle">
+            <TextEditorContent />
+          </div>
+        </TextEditorProvider>
+      </div>
+      <div v-show="isPreview" :style="editorStyle" class="preview-pane" v-html="previewHtml" />
       <p v-if="error" class="error-msg">{{ error }}</p>
     </main>
 
