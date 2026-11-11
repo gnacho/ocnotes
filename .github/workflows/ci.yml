@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (build, vet, test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          # The patched minor instead of the exact go.mod version: with a
+          # pinned patch govulncheck flags standard library issues that Go
+          # already fixed (see the same change in ocnews #74).
+          go-version: '1.26.x'
+          check-latest: true
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test ./...
+
+  security:
+    name: Security (gosec, govulncheck)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: '1.26.x'
+          check-latest: true
+          cache: true
+          cache-dependency-path: backend/go.sum
+      - name: gosec (SARIF, no bloquea)
+        run: |
+          go run github.com/securego/gosec/v2/cmd/gosec@v2.25.0 -no-fail -fmt sarif -out results.sarif -exclude=G104 ./...
+      # The SARIF upload needs code scanning and a token with
+      # security-events: write, which Dependabot PRs do not get. When it
+      # cannot run the report is kept as an artifact and the job continues:
+      # govulncheck is what blocks.
+      - name: Upload gosec SARIF
+        id: sarif
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: backend/results.sarif
+      - name: Keep gosec SARIF as artifact
+        if: steps.sarif.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gosec-sarif
+          path: backend/results.sarif
+          if-no-files-found: ignore
+      - name: govulncheck (bloquea)
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  extension:
+    name: Extension (types, build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - name: Install
+        working-directory: extension
+        run: npm ci
+      - name: Types
+        working-directory: extension
+        run: npm run check:types
+      - name: Build
+        working-directory: extension
+        run: npm run build
