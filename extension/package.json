@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --mode development",
-    "build": "vite build"
+    "build": "vite build",
+    "check:types": "vue-tsc --noEmit"
   },
   "devDependencies": {
     "@opencloud-eu/extension-sdk": "^7.4.0",
