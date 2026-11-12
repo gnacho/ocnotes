@@ -108,6 +108,22 @@ location /index.php/apps/notes/ {
 }
 ```
 
+## Mobile app (Android)
+
+Notes has a native Android client: [ocnotes-android](https://github.com/gnacho/ocnotes-android)
+(Kotlin + Jetpack Compose, AGPL-3.0). It talks to the same Notes API v1.4 served by
+`ocapps`, so it works with this backend and with any Nextcloud Notes server.
+
+- Download the signed APK from the [latest release](https://github.com/gnacho/ocnotes-android/releases/latest).
+- In the app, enter your OpenCloud server URL, your user name and an **app token**
+  (OpenCloud settings, App tokens, or `opencloud auth-app create`). A password will
+  not work.
+- The server path is built automatically as `/index.php/apps/notes/api/v1/`, so the
+  server URL must be the base one (`https://cloud.example.com`).
+- Offline-first: notes are cached locally and pending changes are pushed when the
+  connection is back. Signing out deletes the local cache, so copy anything unsaved
+  before doing it.
+
 ## Store package / release zip
 
 Releases are built automatically by GitHub Actions when a tag `notes-v*` is pushed.
