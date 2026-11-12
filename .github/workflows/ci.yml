@@ -95,6 +95,9 @@ jobs:
       - name: Types
         working-directory: extension
         run: npm run check:types
+      - name: Tests
+        working-directory: extension
+        run: npm test
       - name: Build
         working-directory: extension
         run: npm run build

@@ -18,6 +18,7 @@ import {
 import type { Note } from '../stores/notes'
 import { state, toggleZenMode } from '../stores/notes'
 import { useNotesApi } from '../composables/api'
+import { createDirtyBaseline, hasUnsavedChanges } from '../utils/dirty'
 import { useGettext } from 'vue3-gettext'
 import ModalDialog from './ModalDialog.vue'
 
@@ -81,6 +82,12 @@ const editor = useTextEditor({
   excludeActions: ['source-mode', 'image', 'image-url', 'image-upload', 'image-cloud'],
 })
 
+// The host editor round-trips markdown through its own serializer: escaping
+// (for example `~` -> `\~`) and trailing newlines can differ from the stored
+// note without any user edit. The clean state is therefore the editor's own
+// output after loading a note, not the raw markdown from the API.
+const dirtyBaseline = ref(createDirtyBaseline(title.value, props.note.content))
+
 // Keep the header "rich/plain" toggle in sync with the editor's source mode.
 watch(
   () => state.displayMode,
@@ -89,8 +96,8 @@ watch(
   },
 )
 
-const isDirty = computed(
-  () => title.value !== props.note.title || content.value !== props.note.content,
+const isDirty = computed(() =>
+  hasUnsavedChanges(dirtyBaseline.value, title.value, content.value),
 )
 
 function currentContent(): string {
@@ -101,7 +108,7 @@ function currentContent(): string {
 // editor content directly instead of the debounced `content` ref, so a switch
 // right after typing cannot drop the last keystrokes.
 function isDirtyNow(): boolean {
-  return title.value !== props.note.title || currentContent() !== props.note.content
+  return hasUnsavedChanges(dirtyBaseline.value, title.value, currentContent())
 }
 
 const categories = computed(() => {
@@ -116,8 +123,9 @@ const categories = computed(() => {
 function resetTo(n: Note) {
   revokeAttachments()
   title.value = n.title
-  content.value = n.content
   editor.setContent(n.content)
+  dirtyBaseline.value = createDirtyBaseline(n.title, editor.getContent())
+  content.value = dirtyBaseline.value.content
   error.value = null
   showConfirmDelete.value = false
 }
@@ -210,8 +218,8 @@ async function save() {
   try {
     const current = editor.getContent()
     const payload: Partial<Note> = {}
-    if (title.value !== props.note.title) payload.title = title.value
-    if (current !== props.note.content) payload.content = current
+    if (title.value !== dirtyBaseline.value.title) payload.title = title.value
+    if (current !== dirtyBaseline.value.content) payload.content = current
     if (!Object.keys(payload).length) return
     const resp = await api.updateNote(props.note.id, payload, props.note.etag)
     const updated = (resp as { data?: Note }).data
@@ -219,6 +227,7 @@ async function save() {
       etag: updated?.etag ?? props.note.etag,
       modified: updated?.modified ?? Date.now() / 1000,
     })
+    dirtyBaseline.value = createDirtyBaseline(title.value, current)
     content.value = current
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -272,7 +281,11 @@ async function changeCategory(cat: string) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onWindowKeydown))
+onMounted(() => {
+  window.addEventListener('keydown', onWindowKeydown)
+  dirtyBaseline.value = createDirtyBaseline(title.value, editor.getContent())
+  content.value = dirtyBaseline.value.content
+})
 onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown))
 onBeforeUnmount(revokeAttachments)
 
