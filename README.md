@@ -47,9 +47,63 @@ server that also covers News and ocphotos:
 
 ## Install
 
-### The easy way (`ocapps-ext`)
+Notes is **two pieces** and both are required:
 
-The app ships as a release asset and can be installed and updated from the
+1. The **backend** (`ocapps`), a Go service that serves the Notes API. Without it
+   the web app opens and every request fails with `Request failed with status code 404`.
+2. The **web extension** (the `notes-X.Y.Z.zip` release asset), which is the UI
+   inside OpenCloud.
+
+Installing only the extension is the most common mistake, so start with the
+backend.
+
+### 1. Backend (`ocapps`), required
+
+It runs next to OpenCloud on the same server, listens on port 8096 and
+authenticates against OpenCloud's Graph API. The one-command installer sets up
+the service user, the binary, the environment file, the systemd unit and the
+extension, with `--apps notes` to skip the News and Photos ones:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gnacho/ocapps/main/install.sh \
+  | sudo sh -s -- --url https://cloud.example.com --apps notes
+```
+
+It does not touch your reverse proxy, so these two locations are on you.
+OpenCloud does not forward them itself.
+
+```nginx
+location /index.php/apps/notes/ {
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass http://127.0.0.1:8096;
+}
+
+location = /ocs/v2.php/cloud/capabilities {
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_pass http://127.0.0.1:8096;
+}
+```
+
+OpenCloud also has to see the extension folder: `WEB_ASSET_APPS_PATH` must point
+to it (`/etc/opencloud/web/assets/apps` on a standard install).
+
+Full guide, Docker Compose deployment and Caddy/Traefik equivalents:
+[`ocapps/deploy/README.md`](https://github.com/gnacho/ocapps/blob/main/deploy/README.md).
+
+Check the backend before blaming the proxy:
+
+```bash
+systemctl is-active opencloud-apps
+curl -i http://127.0.0.1:8096/healthz
+```
+
+### 2. Web extension
+
+#### Easy way (`ocapps-ext`)
+
+The extension ships as a release asset and can be installed and updated from the
 server with [`ocapps-ext`](https://github.com/gnacho/ocapps/blob/main/deploy/README.md):
 
 ```bash
@@ -65,7 +119,7 @@ the app appears in `/config.json` with a reachable entry point. If that check
 fails it restores the previous build on its own. Directories built by hand are
 marked `local:<date>` and are never overwritten unless you pass `--force`.
 
-### Manual install
+#### Manual install
 
 Download the latest release zip from the [releases page](https://github.com/gnacho/ocnotes/releases):
 
@@ -83,7 +137,7 @@ notes:
 
 Restart OpenCloud. The Notes app appears in the app switcher.
 
-### Build from source
+#### Build from source
 
 ```bash
 cd extension
@@ -91,22 +145,6 @@ pnpm install && pnpm build
 ```
 
 Copy `dist/` to the OpenCloud apps folder as `notes/`.
-
-### Backend (ocapps)
-
-The backend lives in the [ocapps](https://github.com/gnacho/ocapps) repo.
-See its `deploy/README.md` for the full installation guide (systemd,
-environment variables, reverse proxy snippets).
-
-Quick reference for the proxy:
-
-```nginx
-location /index.php/apps/notes/ {
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_pass http://127.0.0.1:8096;
-}
-```
 
 ## Mobile app (Android)
 
